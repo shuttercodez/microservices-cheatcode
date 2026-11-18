@@ -1,0 +1,9 @@
+/Users/mcbuzz/workspace/microservices-cheatcode/rust-microservice-starter/target/debug/deps/once_cell-26ccf122468ba71b.d: /Users/mcbuzz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/once_cell-1.21.4/src/lib.rs /Users/mcbuzz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/once_cell-1.21.4/src/imp_std.rs /Users/mcbuzz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/once_cell-1.21.4/src/race.rs
+
+/Users/mcbuzz/workspace/microservices-cheatcode/rust-microservice-starter/target/debug/deps/libonce_cell-26ccf122468ba71b.rlib: /Users/mcbuzz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/once_cell-1.21.4/src/lib.rs /Users/mcbuzz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/once_cell-1.21.4/src/imp_std.rs /Users/mcbuzz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/once_cell-1.21.4/src/race.rs
+
+/Users/mcbuzz/workspace/microservices-cheatcode/rust-microservice-starter/target/debug/deps/libonce_cell-26ccf122468ba71b.rmeta: /Users/mcbuzz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/once_cell-1.21.4/src/lib.rs /Users/mcbuzz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/once_cell-1.21.4/src/imp_std.rs /Users/mcbuzz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/once_cell-1.21.4/src/race.rs
+
+/Users/mcbuzz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/once_cell-1.21.4/src/lib.rs:
+/Users/mcbuzz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/once_cell-1.21.4/src/imp_std.rs:
+/Users/mcbuzz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/once_cell-1.21.4/src/race.rs:

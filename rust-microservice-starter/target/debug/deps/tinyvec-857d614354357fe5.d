@@ -1,0 +1,11 @@
+/Users/mcbuzz/workspace/microservices-cheatcode/rust-microservice-starter/target/debug/deps/tinyvec-857d614354357fe5.d: /Users/mcbuzz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tinyvec-1.13.3/src/lib.rs /Users/mcbuzz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tinyvec-1.13.3/src/array.rs /Users/mcbuzz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tinyvec-1.13.3/src/array/const_generic_impl.rs /Users/mcbuzz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tinyvec-1.13.3/src/arrayvec.rs /Users/mcbuzz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tinyvec-1.13.3/src/arrayvec_drain.rs /Users/mcbuzz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tinyvec-1.13.3/src/slicevec.rs /Users/mcbuzz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tinyvec-1.13.3/src/tinyvec.rs
+
+/Users/mcbuzz/workspace/microservices-cheatcode/rust-microservice-starter/target/debug/deps/libtinyvec-857d614354357fe5.rmeta: /Users/mcbuzz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tinyvec-1.13.3/src/lib.rs /Users/mcbuzz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tinyvec-1.13.3/src/array.rs /Users/mcbuzz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tinyvec-1.13.3/src/array/const_generic_impl.rs /Users/mcbuzz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tinyvec-1.13.3/src/arrayvec.rs /Users/mcbuzz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tinyvec-1.13.3/src/arrayvec_drain.rs /Users/mcbuzz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tinyvec-1.13.3/src/slicevec.rs /Users/mcbuzz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tinyvec-1.13.3/src/tinyvec.rs
+
+/Users/mcbuzz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tinyvec-1.13.3/src/lib.rs:
+/Users/mcbuzz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tinyvec-1.13.3/src/array.rs:
+/Users/mcbuzz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tinyvec-1.13.3/src/array/const_generic_impl.rs:
+/Users/mcbuzz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tinyvec-1.13.3/src/arrayvec.rs:
+/Users/mcbuzz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tinyvec-1.13.3/src/arrayvec_drain.rs:
+/Users/mcbuzz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tinyvec-1.13.3/src/slicevec.rs:
+/Users/mcbuzz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tinyvec-1.13.3/src/tinyvec.rs:
