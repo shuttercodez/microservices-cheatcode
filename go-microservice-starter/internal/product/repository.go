@@ -7,7 +7,7 @@ import (
 	"gorm.io/gorm"
 )
 
-// Repository กำหนด Interface สำหรับจัดการข้อมูลสินค้าใน Database
+// Repository defines the data access contract for product persistence.
 type Repository interface {
 	Create(ctx context.Context, product *Product) error
 	FindAll(ctx context.Context) ([]Product, error)
@@ -21,7 +21,7 @@ type gormRepository struct {
 	db *gorm.DB
 }
 
-// NewRepository สร้าง Repository ที่เชื่อมต่อกับ GORM
+// NewRepository creates a GORM-backed Product Repository.
 func NewRepository(db *gorm.DB) Repository {
 	return &gormRepository{db: db}
 }
@@ -56,7 +56,7 @@ func (r *gormRepository) Update(ctx context.Context, product *Product) error {
 	return r.db.WithContext(ctx).Save(product).Error
 }
 
-// UpdateStockWithVersion อัปเดตสต็อกพร้อมตรวจสอบ Version (Optimistic Locking)
+// UpdateStockWithVersion updates product stock using optimistic locking via the version column.
 func (r *gormRepository) UpdateStockWithVersion(ctx context.Context, product *Product, newStock int) error {
 	result := r.db.WithContext(ctx).Model(&Product{}).
 		Where("id = ? AND version = ?", product.ID, product.Version).

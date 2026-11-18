@@ -2,16 +2,9 @@ package product
 
 import (
 	"context"
-	"encoding/json"
-	"log/slog"
-	"time"
-
-	"go-microservice-starter/internal/platform/queue"
-
-	"github.com/google/uuid"
 )
 
-// Service กำหนด Interface สำหรับ Business Logic ของระบบสินค้า
+// Service defines the business logic contract for managing products.
 type Service interface {
 	Create(ctx context.Context, req CreateProductRequest) (*Product, error)
 	GetAll(ctx context.Context) ([]Product, error)
@@ -22,15 +15,17 @@ type Service interface {
 }
 
 type service struct {
-	repo Repository
-	mq   *queue.RabbitMQ
+	repo     Repository
+	cache    Cache
+	producer Producer
 }
 
-// NewService สร้าง Service พร้อมผูก Repository และ RabbitMQ
-func NewService(repo Repository, mq *queue.RabbitMQ) Service {
+// NewService creates a new Product Service with injected Repository, Cache, and Producer dependencies.
+func NewService(repo Repository, cache Cache, producer Producer) Service {
 	return &service{
-		repo: repo,
-		mq:   mq,
+		repo:     repo,
+		cache:    cache,
+		producer: producer,
 	}
 }
 
@@ -50,7 +45,10 @@ func (s *service) Create(ctx context.Context, req CreateProductRequest) (*Produc
 		return nil, err
 	}
 
-	s.publishStockEvent(*product)
+	if s.cache != nil {
+		_ = s.cache.Set(ctx, product)
+	}
+	_ = s.producer.PublishStockChanged(ctx, *product)
 	return product, nil
 }
 
@@ -58,8 +56,23 @@ func (s *service) GetAll(ctx context.Context) ([]Product, error) {
 	return s.repo.FindAll(ctx)
 }
 
+// GetByID implements the Cache-Aside pattern: check Redis first, fallback to DB on miss, and populate Redis.
 func (s *service) GetByID(ctx context.Context, id string) (*Product, error) {
-	return s.repo.FindByID(ctx, id)
+	if s.cache != nil {
+		if cached, err := s.cache.Get(ctx, id); err == nil && cached != nil {
+			return cached, nil
+		}
+	}
+
+	product, err := s.repo.FindByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	if s.cache != nil {
+		_ = s.cache.Set(ctx, product)
+	}
+	return product, nil
 }
 
 func (s *service) Update(ctx context.Context, id string, req CreateProductRequest) (*Product, error) {
@@ -82,7 +95,11 @@ func (s *service) Update(ctx context.Context, id string, req CreateProductReques
 		return nil, err
 	}
 
-	s.publishStockEvent(*product)
+	// Update or invalidate cache so subsequent reads get fresh data
+	if s.cache != nil {
+		_ = s.cache.Set(ctx, product)
+	}
+	_ = s.producer.PublishStockChanged(ctx, *product)
 	return product, nil
 }
 
@@ -91,6 +108,7 @@ func (s *service) PatchStock(ctx context.Context, id string, req PatchStockReque
 		return nil, ErrNegativeStock
 	}
 
+	// Always read current version directly from the database for optimistic locking
 	product, err := s.repo.FindByID(ctx, id)
 	if err != nil {
 		return nil, err
@@ -100,35 +118,21 @@ func (s *service) PatchStock(ctx context.Context, id string, req PatchStockReque
 		return nil, err
 	}
 
-	s.publishStockEvent(*product)
+	// Refresh Redis cache with the new stock and incremented version
+	if s.cache != nil {
+		_ = s.cache.Set(ctx, product)
+	}
+	_ = s.producer.PublishStockChanged(ctx, *product)
 	return product, nil
 }
 
 func (s *service) Delete(ctx context.Context, id string) error {
-	return s.repo.Delete(ctx, id)
-}
-
-func (s *service) publishStockEvent(p Product) {
-	if s.mq == nil {
-		return
+	if err := s.repo.Delete(ctx, id); err != nil {
+		return err
 	}
 
-	event := StockChangedEvent{
-		EventID:   uuid.NewString(),
-		ProductID: p.ID,
-		SKU:       p.SKU,
-		NewStock:  p.Stock,
-		Timestamp: time.Now(),
+	if s.cache != nil {
+		_ = s.cache.Delete(ctx, id)
 	}
-	body, err := json.Marshal(event)
-	if err != nil {
-		slog.Error("Failed to marshal stock event", "error", err)
-		return
-	}
-
-	if err := s.mq.Publish(context.Background(), QueueStockChanged, body); err != nil {
-		slog.Error("Failed to publish message to RabbitMQ", "error", err)
-	} else {
-		slog.Info("Published event to RabbitMQ (Fiber)", "event_id", event.EventID, "sku", p.SKU, "stock", p.Stock)
-	}
+	return nil
 }

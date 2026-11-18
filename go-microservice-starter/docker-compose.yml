@@ -18,7 +18,7 @@ services:
       timeout: 5s
       retries: 5
 
-  # ตัวจัดการ Database Migration / Changelog อัตโนมัติ
+  # Automated database schema migration service
   migrate:
     image: migrate/migrate
     container_name: inventory_migrate
@@ -39,10 +39,21 @@ services:
       RABBITMQ_DEFAULT_USER: guest
       RABBITMQ_DEFAULT_PASS: guest
     ports:
-      - "5672:5672"   # AMQP Port สำหรับ Go เชื่อมต่อ
-      - "15672:15672" # Web UI สำหรับเข้าไปดู Queue (http://localhost:15672)
+      - "5672:5672"   # AMQP port for Go client connections
+      - "15672:15672" # Management Web UI (http://localhost:15672)
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: inventory_redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 5s
       retries: 5

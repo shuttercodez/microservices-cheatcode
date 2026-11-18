@@ -18,7 +18,7 @@ var (
 	ErrSKUConflict     = errors.New("SKU might already exist or database error")
 )
 
-// Product โครงสร้างตารางสินค้าสำหรับ GORM
+// Product represents the database entity for products managed by GORM.
 type Product struct {
 	ID        uuid.UUID      `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
 	SKU       string         `gorm:"type:varchar(64);uniqueIndex;not null" json:"sku"`
@@ -31,7 +31,7 @@ type Product struct {
 	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
-// CreateProductRequest Struct สำหรับตรวจสอบค่าตอน Bind Request (POST / PUT)
+// CreateProductRequest represents the request DTO for creating or replacing a product (POST / PUT).
 type CreateProductRequest struct {
 	SKU   string  `json:"sku"`
 	Name  string  `json:"name"`
@@ -39,12 +39,12 @@ type CreateProductRequest struct {
 	Stock int     `json:"stock"`
 }
 
-// PatchStockRequest Struct สำหรับอัปเดตเฉพาะสต็อก (PATCH)
+// PatchStockRequest represents the request DTO for updating product stock (PATCH).
 type PatchStockRequest struct {
 	Stock int `json:"stock"`
 }
 
-// StockChangedEvent Event Payload สำหรับส่งเข้า RabbitMQ
+// StockChangedEvent represents the event payload published to RabbitMQ when product stock changes.
 type StockChangedEvent struct {
 	EventID   string    `json:"event_id"`
 	ProductID uuid.UUID `json:"product_id"`

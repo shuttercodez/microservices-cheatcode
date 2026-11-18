@@ -6,17 +6,17 @@ import (
 	"github.com/gofiber/fiber/v2"
 )
 
-// Handler จัดการ HTTP Request / Response ของ Fiber
+// Handler manages HTTP requests and responses for product endpoints.
 type Handler struct {
 	service Service
 }
 
-// NewHandler สร้าง Fiber Handler สำหรับ Product
+// NewHandler creates a new Fiber HTTP handler for products.
 func NewHandler(service Service) *Handler {
 	return &Handler{service: service}
 }
 
-// RegisterRoutes ลงทะเบียน RESTful API Endpoints เข้ากับ Fiber Router
+// RegisterRoutes registers RESTful product routes on the Fiber router.
 func (h *Handler) RegisterRoutes(router fiber.Router) {
 	v1 := router.Group("/api/v1/products")
 
@@ -28,7 +28,7 @@ func (h *Handler) RegisterRoutes(router fiber.Router) {
 	v1.Delete("/:id", h.Delete)
 }
 
-// Create POST: สร้างสินค้าใหม่
+// Create handles POST requests to create a new product.
 func (h *Handler) Create(c *fiber.Ctx) error {
 	var req CreateProductRequest
 	if err := c.BodyParser(&req); err != nil {
@@ -46,7 +46,7 @@ func (h *Handler) Create(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusCreated).JSON(product)
 }
 
-// GetAll GET (All): ดึงรายการสินค้าทั้งหมด
+// GetAll handles GET requests to retrieve all products.
 func (h *Handler) GetAll(c *fiber.Ctx) error {
 	products, err := h.service.GetAll(c.UserContext())
 	if err != nil {
@@ -55,7 +55,7 @@ func (h *Handler) GetAll(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusOK).JSON(products)
 }
 
-// GetByID GET (By ID): ดูสินค้าตาม ID
+// GetByID handles GET requests to retrieve a product by its ID.
 func (h *Handler) GetByID(c *fiber.Ctx) error {
 	id := c.Params("id")
 	product, err := h.service.GetByID(c.UserContext(), id)
@@ -68,7 +68,7 @@ func (h *Handler) GetByID(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusOK).JSON(product)
 }
 
-// Update PUT: แก้ไขข้อมูลสินค้าทั้งก้อน (Full Replace)
+// Update handles PUT requests for a full replacement of product details.
 func (h *Handler) Update(c *fiber.Ctx) error {
 	id := c.Params("id")
 
@@ -92,7 +92,7 @@ func (h *Handler) Update(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusOK).JSON(product)
 }
 
-// PatchStock PATCH: อัปเดตเฉพาะจำนวนสต็อก (Partial Update + Optimistic Locking)
+// PatchStock handles PATCH requests for partial stock updates using optimistic locking.
 func (h *Handler) PatchStock(c *fiber.Ctx) error {
 	id := c.Params("id")
 
@@ -118,7 +118,7 @@ func (h *Handler) PatchStock(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusOK).JSON(product)
 }
 
-// Delete DELETE: ลบสินค้า (Soft Delete ด้วย GORM)
+// Delete handles DELETE requests to soft-delete a product via GORM.
 func (h *Handler) Delete(c *fiber.Ctx) error {
 	id := c.Params("id")
 	if err := h.service.Delete(c.UserContext(), id); err != nil {

@@ -8,7 +8,7 @@ import (
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
-// StartQueueConsumer รัน Background Worker เพื่อรับ Event จาก RabbitMQ
+// StartQueueConsumer runs a background worker to consume stock change events from RabbitMQ.
 func StartQueueConsumer(ctx context.Context, conn *amqp.Connection, queueName string) {
 	ch, err := conn.Channel()
 	if err != nil {

@@ -6,13 +6,13 @@ import (
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
-// RabbitMQ จัดการ Connection และ Channel สำหรับส่งข้อความ
+// RabbitMQ manages the AMQP connection and channel for message publishing.
 type RabbitMQ struct {
 	Conn    *amqp.Connection
 	Channel *amqp.Channel
 }
 
-// NewRabbitMQ เชื่อมต่อ RabbitMQ และเปิด Channel พื้นฐาน
+// NewRabbitMQ establishes a connection to RabbitMQ and opens a default channel.
 func NewRabbitMQ(url string) (*RabbitMQ, error) {
 	conn, err := amqp.Dial(url)
 	if err != nil {
@@ -31,27 +31,27 @@ func NewRabbitMQ(url string) (*RabbitMQ, error) {
 	}, nil
 }
 
-// DeclareQueue สร้าง Queue แบบ Durable
+// DeclareQueue declares a durable queue on the RabbitMQ broker.
 func (r *RabbitMQ) DeclareQueue(queueName string) error {
 	_, err := r.Channel.QueueDeclare(queueName, true, false, false, false, nil)
 	return err
 }
 
-// Publish ส่งข้อความแบบ Persistent เข้า Queue
+// Publish sends a persistent JSON message to the specified queue.
 func (r *RabbitMQ) Publish(ctx context.Context, queueName string, body []byte) error {
 	return r.Channel.PublishWithContext(ctx, "", queueName, false, false, amqp.Publishing{
 		ContentType:  "application/json",
-		DeliveryMode: amqp.Persistent, // ป้องกันข้อความหายเมื่อ MQ ล่ม
+		DeliveryMode: amqp.Persistent, // Persist messages to disk to survive broker restarts
 		Body:         body,
 	})
 }
 
-// IsClosed เช็กว่า Connection ปิดไปแล้วหรือยัง
+// IsClosed checks whether the underlying AMQP connection is closed.
 func (r *RabbitMQ) IsClosed() bool {
 	return r.Conn == nil || r.Conn.IsClosed()
 }
 
-// Close ปิด Channel และ Connection อย่างปลอดภัย
+// Close safely closes the AMQP channel and connection.
 func (r *RabbitMQ) Close() {
 	if r.Channel != nil {
 		_ = r.Channel.Close()

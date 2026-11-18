@@ -3,13 +3,16 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
+	"go-microservice-starter/internal/config"
+	"go-microservice-starter/internal/order"
+	"go-microservice-starter/internal/platform/cache"
 	"go-microservice-starter/internal/platform/database"
 	"go-microservice-starter/internal/platform/queue"
 	"go-microservice-starter/internal/product"
@@ -19,20 +22,38 @@ import (
 )
 
 func main() {
-	// ใช้ Structured JSON Logger ตามมาตรฐาน Microservices
+	// Initialize structured JSON logger following microservice standards
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	slog.SetDefault(logger)
 
-	// 1. เชื่อมต่อ PostgreSQL ด้วย GORM
-	dsn := "host=localhost user=appuser password=apppassword dbname=inventory_db port=5432 sslmode=disable"
-	db, err := database.NewPostgresDB(dsn)
+	// 0. Load configuration from YAML (with Cloud Vault / Environment Variable overrides)
+	configPath := os.Getenv("CONFIG_PATH")
+	if configPath == "" {
+		configPath = "config/config.yaml"
+	}
+	cfg, err := config.Load(configPath)
+	if err != nil {
+		slog.Error("Failed to load application configuration", "path", configPath, "error", err)
+		os.Exit(1)
+	}
+
+	// 1. Connect to PostgreSQL using GORM
+	db, err := database.NewPostgresDB(cfg.Database.DSN())
 	if err != nil {
 		slog.Error("Failed to connect to PostgreSQL", "error", err)
 		os.Exit(1)
 	}
 
-	// 2. เชื่อมต่อ RabbitMQ และสร้าง Queue
-	mq, err := queue.NewRabbitMQ("amqp://guest:guest@localhost:5672/")
+	// 2. Connect to Redis Cache
+	redisCache, err := cache.NewRedisCache(cfg.Redis.Addr)
+	if err != nil {
+		slog.Error("Failed to connect to Redis", "error", err)
+		os.Exit(1)
+	}
+	defer redisCache.Close()
+
+	// 3. Connect to RabbitMQ and declare queues
+	mq, err := queue.NewRabbitMQ(cfg.RabbitMQ.URL)
 	if err != nil {
 		slog.Error("Failed to connect to RabbitMQ", "error", err)
 		os.Exit(1)
@@ -40,26 +61,40 @@ func main() {
 	defer mq.Close()
 
 	if err := mq.DeclareQueue(product.QueueStockChanged); err != nil {
-		slog.Error("Failed to declare queue", "error", err)
+		slog.Error("Failed to declare product queue", "error", err)
+		os.Exit(1)
+	}
+	if err := mq.DeclareQueue(order.QueueOrderCreated); err != nil {
+		slog.Error("Failed to declare order queue", "error", err)
 		os.Exit(1)
 	}
 
-	// 3. รัน Background Consumer
+	// 4. Start background queue consumers
 	ctx, cancelConsumer := context.WithCancel(context.Background())
 	go product.StartQueueConsumer(ctx, mq.Conn, product.QueueStockChanged)
+	go order.StartQueueConsumer(ctx, mq.Conn, order.QueueOrderCreated)
 
-	// 4. Dependency Injection (Repository -> Service -> Handler)
+	// 5. Dependency Injection (Repository, Cache & Producer -> Service -> Handler)
+	// --- Product Domain ---
 	productRepo := product.NewRepository(db)
-	productService := product.NewService(productRepo, mq)
+	productCache := product.NewCache(redisCache)
+	productProducer := product.NewProducer(mq)
+	productService := product.NewService(productRepo, productCache, productProducer)
 	productHandler := product.NewHandler(productService)
 
-	// 5. ตั้งค่า Fiber App
+	// --- Order Domain (Inject productService for cross-domain stock verification and deduction) ---
+	orderRepo := order.NewRepository(db)
+	orderProducer := order.NewProducer(mq)
+	orderService := order.NewService(orderRepo, productService, orderProducer)
+	orderHandler := order.NewHandler(orderService)
+
+	// 6. Configure Fiber application
 	app := fiber.New(fiber.Config{
-		// ช่วยปิดการแสดงผลหน้า Banner ตอนเริ่มโปรแกรมของ Fiber เพื่อให้ Log อ่านง่ายขึ้น
+		AppName:               cfg.App.Name,
 		DisableStartupMessage: true,
 	})
 
-	// ใส่ Middleware กันโปรแกรมแครช (Recover)
+	// Register panic recovery middleware
 	app.Use(recover.New())
 
 	// --- Microservice Health & Readiness Probes ---
@@ -68,7 +103,7 @@ func main() {
 	})
 
 	app.Get("/readyz", func(c *fiber.Ctx) error {
-		if err := database.Ping(db); err != nil || mq.IsClosed() {
+		if err := database.Ping(db); err != nil || redisCache.Ping(c.UserContext()) != nil || mq.IsClosed() {
 			return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{"status": "not ready"})
 		}
 		return c.Status(fiber.StatusOK).JSON(fiber.Map{"status": "ready"})
@@ -76,25 +111,27 @@ func main() {
 
 	// --- RESTful API Endpoints ---
 	productHandler.RegisterRoutes(app)
+	orderHandler.RegisterRoutes(app)
 
-	// 6. รัน Fiber Server และตั้งค่า Graceful Shutdown
+	// 7. Start Fiber server and configure graceful shutdown
+	listenAddr := fmt.Sprintf(":%d", cfg.App.Port)
 	go func() {
-		slog.Info("Starting Fiber HTTP server on :8080")
-		if err := app.Listen(":8080"); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		slog.Info("Starting Fiber HTTP server", "app", cfg.App.Name, "env", cfg.App.Env, "addr", listenAddr)
+		if err := app.Listen(listenAddr); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			slog.Error("Server failed to start", "error", err)
 		}
 	}()
 
-	// รอรับสัญญาณปิดระบบ
+	// Wait for termination signals (SIGINT, SIGTERM)
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
 	slog.Info("Shutting down service gracefully...")
-	cancelConsumer() // หยุดการทำงานของ Consumer ใน Background
+	cancelConsumer() // Stop background consumers
 
-	// สั่งปิดตัวแอป Fiber (ระบบจะเคลียร์ Connection ที่ค้างอยู่ให้อัตโนมัติ)
-	if err := app.ShutdownWithTimeout(5 * time.Second); err != nil {
+	// Gracefully shut down Fiber server (draining active connections)
+	if err := app.ShutdownWithTimeout(cfg.App.ShutdownTimeout()); err != nil {
 		slog.Error("Fiber forced to shutdown", "error", err)
 	}
 	slog.Info("Service exited cleanly")
