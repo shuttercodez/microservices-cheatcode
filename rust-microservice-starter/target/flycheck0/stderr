@@ -1,98 +1,16 @@
-   0.183060500s  INFO prepare_target{force=false package_id=rust-microservice-starter v0.1.0 (/Users/mcbuzz/workspace/microservices-cheatcode/rust-microservice-starter) target="rust_microservice_starter"}: cargo::core::compiler::fingerprint: fingerprint error for rust-microservice-starter v0.1.0 (/Users/mcbuzz/workspace/microservices-cheatcode/rust-microservice-starter)/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("rust_microservice_starter", ["lib"], "/Users/mcbuzz/workspace/microservices-cheatcode/rust-microservice-starter/src/lib.rs", Edition2021) }
-   0.183082209s  INFO prepare_target{force=false package_id=rust-microservice-starter v0.1.0 (/Users/mcbuzz/workspace/microservices-cheatcode/rust-microservice-starter) target="rust_microservice_starter"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/mcbuzz/workspace/microservices-cheatcode/rust-microservice-starter/target/debug/.fingerprint/rust-microservice-starter-a51e832640ae57ee/lib-rust_microservice_starter`
-
-Caused by:
-    No such file or directory (os error 2)
-
-Stack backtrace:
-   0: <std::backtrace::Backtrace>::create
-   1: cargo_util::paths::read_bytes
-   2: cargo_util::paths::read
-   3: cargo::core::compiler::fingerprint::_compare_old_fingerprint
-   4: cargo::core::compiler::fingerprint::prepare_target
-   5: cargo::core::compiler::compile
-   6: <cargo::core::compiler::build_runner::BuildRunner>::compile
-   7: cargo::ops::cargo_compile::compile_ws
-   8: cargo::ops::cargo_compile::compile_with_exec
-   9: cargo::ops::cargo_compile::compile
-  10: cargo::commands::check::exec
-  11: <cargo::cli::Exec>::exec
-  12: cargo::main
-  13: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
-  14: std::rt::lang_start::<()>::{closure#0}
-  15: std::rt::lang_start_internal
-  16: _main
-   0.240899292s  INFO prepare_target{force=false package_id=rust-microservice-starter v0.1.0 (/Users/mcbuzz/workspace/microservices-cheatcode/rust-microservice-starter) target="rust_microservice_starter"}: cargo::core::compiler::fingerprint: fingerprint error for rust-microservice-starter v0.1.0 (/Users/mcbuzz/workspace/microservices-cheatcode/rust-microservice-starter)/Check { test: true }/TargetInner { name_inferred: true, ..: lib_target("rust_microservice_starter", ["lib"], "/Users/mcbuzz/workspace/microservices-cheatcode/rust-microservice-starter/src/lib.rs", Edition2021) }
-   0.240915875s  INFO prepare_target{force=false package_id=rust-microservice-starter v0.1.0 (/Users/mcbuzz/workspace/microservices-cheatcode/rust-microservice-starter) target="rust_microservice_starter"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/mcbuzz/workspace/microservices-cheatcode/rust-microservice-starter/target/debug/.fingerprint/rust-microservice-starter-31a04ca7841f2a76/test-lib-rust_microservice_starter`
-
-Caused by:
-    No such file or directory (os error 2)
-
-Stack backtrace:
-   0: <std::backtrace::Backtrace>::create
-   1: cargo_util::paths::read_bytes
-   2: cargo_util::paths::read
-   3: cargo::core::compiler::fingerprint::_compare_old_fingerprint
-   4: cargo::core::compiler::fingerprint::prepare_target
-   5: cargo::core::compiler::compile
-   6: <cargo::core::compiler::build_runner::BuildRunner>::compile
-   7: cargo::ops::cargo_compile::compile_ws
-   8: cargo::ops::cargo_compile::compile_with_exec
-   9: cargo::ops::cargo_compile::compile
-  10: cargo::commands::check::exec
-  11: <cargo::cli::Exec>::exec
-  12: cargo::main
-  13: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
-  14: std::rt::lang_start::<()>::{closure#0}
-  15: std::rt::lang_start_internal
-  16: _main
-   0.241702500s  INFO prepare_target{force=false package_id=rust-microservice-starter v0.1.0 (/Users/mcbuzz/workspace/microservices-cheatcode/rust-microservice-starter) target="rust-microservice-starter"}: cargo::core::compiler::fingerprint: fingerprint error for rust-microservice-starter v0.1.0 (/Users/mcbuzz/workspace/microservices-cheatcode/rust-microservice-starter)/Check { test: false }/TargetInner { name: "rust-microservice-starter", doc: true, ..: with_path("/Users/mcbuzz/workspace/microservices-cheatcode/rust-microservice-starter/src/main.rs", Edition2021) }
-   0.241710750s  INFO prepare_target{force=false package_id=rust-microservice-starter v0.1.0 (/Users/mcbuzz/workspace/microservices-cheatcode/rust-microservice-starter) target="rust-microservice-starter"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/mcbuzz/workspace/microservices-cheatcode/rust-microservice-starter/target/debug/.fingerprint/rust-microservice-starter-54469f380545e8eb/bin-rust-microservice-starter`
-
-Caused by:
-    No such file or directory (os error 2)
-
-Stack backtrace:
-   0: <std::backtrace::Backtrace>::create
-   1: cargo_util::paths::read_bytes
-   2: cargo_util::paths::read
-   3: cargo::core::compiler::fingerprint::_compare_old_fingerprint
-   4: cargo::core::compiler::fingerprint::prepare_target
-   5: cargo::core::compiler::compile
-   6: <cargo::core::compiler::build_runner::BuildRunner>::compile
-   7: cargo::ops::cargo_compile::compile_ws
-   8: cargo::ops::cargo_compile::compile_with_exec
-   9: cargo::ops::cargo_compile::compile
-  10: cargo::commands::check::exec
-  11: <cargo::cli::Exec>::exec
-  12: cargo::main
-  13: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
-  14: std::rt::lang_start::<()>::{closure#0}
-  15: std::rt::lang_start_internal
-  16: _main
-   0.242227542s  INFO prepare_target{force=false package_id=rust-microservice-starter v0.1.0 (/Users/mcbuzz/workspace/microservices-cheatcode/rust-microservice-starter) target="rust-microservice-starter"}: cargo::core::compiler::fingerprint: fingerprint error for rust-microservice-starter v0.1.0 (/Users/mcbuzz/workspace/microservices-cheatcode/rust-microservice-starter)/Check { test: true }/TargetInner { name: "rust-microservice-starter", doc: true, ..: with_path("/Users/mcbuzz/workspace/microservices-cheatcode/rust-microservice-starter/src/main.rs", Edition2021) }
-   0.242231584s  INFO prepare_target{force=false package_id=rust-microservice-starter v0.1.0 (/Users/mcbuzz/workspace/microservices-cheatcode/rust-microservice-starter) target="rust-microservice-starter"}: cargo::core::compiler::fingerprint:     err: failed to read `/Users/mcbuzz/workspace/microservices-cheatcode/rust-microservice-starter/target/debug/.fingerprint/rust-microservice-starter-919b51d5065e3548/test-bin-rust-microservice-starter`
-
-Caused by:
-    No such file or directory (os error 2)
-
-Stack backtrace:
-   0: <std::backtrace::Backtrace>::create
-   1: cargo_util::paths::read_bytes
-   2: cargo_util::paths::read
-   3: cargo::core::compiler::fingerprint::_compare_old_fingerprint
-   4: cargo::core::compiler::fingerprint::prepare_target
-   5: cargo::core::compiler::compile
-   6: <cargo::core::compiler::build_runner::BuildRunner>::compile
-   7: cargo::ops::cargo_compile::compile_ws
-   8: cargo::ops::cargo_compile::compile_with_exec
-   9: cargo::ops::cargo_compile::compile
-  10: cargo::commands::check::exec
-  11: <cargo::cli::Exec>::exec
-  12: cargo::main
-  13: std::sys::backtrace::__rust_begin_short_backtrace::<fn(), ()>
-  14: std::rt::lang_start::<()>::{closure#0}
-  15: std::rt::lang_start_internal
-  16: _main
+   0.244445292s  INFO prepare_target{force=false package_id=rust-microservice-starter v0.1.0 (/Users/mcbuzz/workspace/microservices-cheatcode/rust-microservice-starter) target="rust_microservice_starter"}: cargo::core::compiler::fingerprint: stale: changed "/Users/mcbuzz/workspace/microservices-cheatcode/rust-microservice-starter/src/config.rs"
+   0.244459708s  INFO prepare_target{force=false package_id=rust-microservice-starter v0.1.0 (/Users/mcbuzz/workspace/microservices-cheatcode/rust-microservice-starter) target="rust_microservice_starter"}: cargo::core::compiler::fingerprint:           (vs) "/Users/mcbuzz/workspace/microservices-cheatcode/rust-microservice-starter/target/debug/.fingerprint/rust-microservice-starter-a51e832640ae57ee/dep-lib-rust_microservice_starter"
+   0.244462333s  INFO prepare_target{force=false package_id=rust-microservice-starter v0.1.0 (/Users/mcbuzz/workspace/microservices-cheatcode/rust-microservice-starter) target="rust_microservice_starter"}: cargo::core::compiler::fingerprint:                FileTime { seconds: 1795012260, nanos: 632455918 } < FileTime { seconds: 1795061764, nanos: 324133952 }
+   0.245481042s  INFO prepare_target{force=false package_id=rust-microservice-starter v0.1.0 (/Users/mcbuzz/workspace/microservices-cheatcode/rust-microservice-starter) target="rust_microservice_starter"}: cargo::core::compiler::fingerprint: fingerprint dirty for rust-microservice-starter v0.1.0 (/Users/mcbuzz/workspace/microservices-cheatcode/rust-microservice-starter)/Check { test: false }/TargetInner { name_inferred: true, ..: lib_target("rust_microservice_starter", ["lib"], "/Users/mcbuzz/workspace/microservices-cheatcode/rust-microservice-starter/src/lib.rs", Edition2021) }
+   0.245698833s  INFO prepare_target{force=false package_id=rust-microservice-starter v0.1.0 (/Users/mcbuzz/workspace/microservices-cheatcode/rust-microservice-starter) target="rust_microservice_starter"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleItem(ChangedFile { reference: "/Users/mcbuzz/workspace/microservices-cheatcode/rust-microservice-starter/target/debug/.fingerprint/rust-microservice-starter-a51e832640ae57ee/dep-lib-rust_microservice_starter", reference_mtime: FileTime { seconds: 1795012260, nanos: 632455918 }, stale: "/Users/mcbuzz/workspace/microservices-cheatcode/rust-microservice-starter/src/config.rs", stale_mtime: FileTime { seconds: 1795061764, nanos: 324133952 } }))
+   0.312584750s  INFO prepare_target{force=false package_id=rust-microservice-starter v0.1.0 (/Users/mcbuzz/workspace/microservices-cheatcode/rust-microservice-starter) target="rust_microservice_starter"}: cargo::core::compiler::fingerprint: stale: changed "/Users/mcbuzz/workspace/microservices-cheatcode/rust-microservice-starter/src/config.rs"
+   0.312593542s  INFO prepare_target{force=false package_id=rust-microservice-starter v0.1.0 (/Users/mcbuzz/workspace/microservices-cheatcode/rust-microservice-starter) target="rust_microservice_starter"}: cargo::core::compiler::fingerprint:           (vs) "/Users/mcbuzz/workspace/microservices-cheatcode/rust-microservice-starter/target/debug/.fingerprint/rust-microservice-starter-31a04ca7841f2a76/dep-test-lib-rust_microservice_starter"
+   0.312595583s  INFO prepare_target{force=false package_id=rust-microservice-starter v0.1.0 (/Users/mcbuzz/workspace/microservices-cheatcode/rust-microservice-starter) target="rust_microservice_starter"}: cargo::core::compiler::fingerprint:                FileTime { seconds: 1795012260, nanos: 632548751 } < FileTime { seconds: 1795061764, nanos: 324133952 }
+   0.313389625s  INFO prepare_target{force=false package_id=rust-microservice-starter v0.1.0 (/Users/mcbuzz/workspace/microservices-cheatcode/rust-microservice-starter) target="rust_microservice_starter"}: cargo::core::compiler::fingerprint: fingerprint dirty for rust-microservice-starter v0.1.0 (/Users/mcbuzz/workspace/microservices-cheatcode/rust-microservice-starter)/Check { test: true }/TargetInner { name_inferred: true, ..: lib_target("rust_microservice_starter", ["lib"], "/Users/mcbuzz/workspace/microservices-cheatcode/rust-microservice-starter/src/lib.rs", Edition2021) }
+   0.313401333s  INFO prepare_target{force=false package_id=rust-microservice-starter v0.1.0 (/Users/mcbuzz/workspace/microservices-cheatcode/rust-microservice-starter) target="rust_microservice_starter"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleItem(ChangedFile { reference: "/Users/mcbuzz/workspace/microservices-cheatcode/rust-microservice-starter/target/debug/.fingerprint/rust-microservice-starter-31a04ca7841f2a76/dep-test-lib-rust_microservice_starter", reference_mtime: FileTime { seconds: 1795012260, nanos: 632548751 }, stale: "/Users/mcbuzz/workspace/microservices-cheatcode/rust-microservice-starter/src/config.rs", stale_mtime: FileTime { seconds: 1795061764, nanos: 324133952 } }))
+   0.314639375s  INFO prepare_target{force=false package_id=rust-microservice-starter v0.1.0 (/Users/mcbuzz/workspace/microservices-cheatcode/rust-microservice-starter) target="rust-microservice-starter"}: cargo::core::compiler::fingerprint: fingerprint dirty for rust-microservice-starter v0.1.0 (/Users/mcbuzz/workspace/microservices-cheatcode/rust-microservice-starter)/Check { test: false }/TargetInner { name: "rust-microservice-starter", doc: true, ..: with_path("/Users/mcbuzz/workspace/microservices-cheatcode/rust-microservice-starter/src/main.rs", Edition2021) }
+   0.314647958s  INFO prepare_target{force=false package_id=rust-microservice-starter v0.1.0 (/Users/mcbuzz/workspace/microservices-cheatcode/rust-microservice-starter) target="rust-microservice-starter"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleDepFingerprint { unit: UnitIndex(308) })
+   0.315388333s  INFO prepare_target{force=false package_id=rust-microservice-starter v0.1.0 (/Users/mcbuzz/workspace/microservices-cheatcode/rust-microservice-starter) target="rust-microservice-starter"}: cargo::core::compiler::fingerprint: fingerprint dirty for rust-microservice-starter v0.1.0 (/Users/mcbuzz/workspace/microservices-cheatcode/rust-microservice-starter)/Check { test: true }/TargetInner { name: "rust-microservice-starter", doc: true, ..: with_path("/Users/mcbuzz/workspace/microservices-cheatcode/rust-microservice-starter/src/main.rs", Edition2021) }
+   0.315394583s  INFO prepare_target{force=false package_id=rust-microservice-starter v0.1.0 (/Users/mcbuzz/workspace/microservices-cheatcode/rust-microservice-starter) target="rust-microservice-starter"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleDepFingerprint { unit: UnitIndex(308) })
     Checking rust-microservice-starter v0.1.0 (/Users/mcbuzz/workspace/microservices-cheatcode/rust-microservice-starter)
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.71s
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.44s
