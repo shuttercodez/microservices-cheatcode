@@ -7,7 +7,7 @@ import (
 // Service defines the business logic contract for managing products.
 type Service interface {
 	Create(ctx context.Context, req CreateProductRequest) (*Product, error)
-	GetAll(ctx context.Context) ([]Product, error)
+	GetAll(ctx context.Context, page, limit int) (*PaginatedProducts, error)
 	GetByID(ctx context.Context, id string) (*Product, error)
 	Update(ctx context.Context, id string, req CreateProductRequest) (*Product, error)
 	PatchStock(ctx context.Context, id string, req PatchStockRequest) (*Product, error)
@@ -29,6 +29,25 @@ func NewService(repo Repository, cache Cache, producer Producer) Service {
 	}
 }
 
+func normalizePagination(page, limit int) (int, int) {
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 {
+		limit = 10
+	} else if limit > 100 {
+		limit = 100
+	}
+	return page, limit
+}
+
+func calcTotalPages(total int64, limit int) int {
+	if total == 0 || limit <= 0 {
+		return 0
+	}
+	return int((total + int64(limit) - 1) / int64(limit))
+}
+
 func (s *service) Create(ctx context.Context, req CreateProductRequest) (*Product, error) {
 	if req.SKU == "" || req.Name == "" || req.Price < 0 || req.Stock < 0 {
 		return nil, ErrInvalidPayload
@@ -47,13 +66,42 @@ func (s *service) Create(ctx context.Context, req CreateProductRequest) (*Produc
 
 	if s.cache != nil {
 		_ = s.cache.Set(ctx, product)
+		_ = s.cache.InvalidateLists(ctx)
 	}
 	_ = s.producer.PublishStockChanged(ctx, *product)
 	return product, nil
 }
 
-func (s *service) GetAll(ctx context.Context) ([]Product, error) {
-	return s.repo.FindAll(ctx)
+// GetAll retrieves a paginated list of products using Cache-Aside with Redis.
+func (s *service) GetAll(ctx context.Context, page, limit int) (*PaginatedProducts, error) {
+	page, limit = normalizePagination(page, limit)
+
+	if s.cache != nil {
+		if cached, err := s.cache.GetList(ctx, page, limit); err == nil && cached != nil {
+			return cached, nil
+		}
+	}
+
+	products, total, err := s.repo.FindAll(ctx, page, limit)
+	if err != nil {
+		return nil, err
+	}
+	if products == nil {
+		products = []Product{}
+	}
+
+	res := &PaginatedProducts{
+		Data:       products,
+		Page:       page,
+		Limit:      limit,
+		Total:      total,
+		TotalPages: calcTotalPages(total, limit),
+	}
+
+	if s.cache != nil {
+		_ = s.cache.SetList(ctx, page, limit, res)
+	}
+	return res, nil
 }
 
 // GetByID implements the Cache-Aside pattern: check Redis first, fallback to DB on miss, and populate Redis.
@@ -95,9 +143,9 @@ func (s *service) Update(ctx context.Context, id string, req CreateProductReques
 		return nil, err
 	}
 
-	// Update or invalidate cache so subsequent reads get fresh data
 	if s.cache != nil {
 		_ = s.cache.Set(ctx, product)
+		_ = s.cache.InvalidateLists(ctx)
 	}
 	_ = s.producer.PublishStockChanged(ctx, *product)
 	return product, nil
@@ -108,7 +156,6 @@ func (s *service) PatchStock(ctx context.Context, id string, req PatchStockReque
 		return nil, ErrNegativeStock
 	}
 
-	// Always read current version directly from the database for optimistic locking
 	product, err := s.repo.FindByID(ctx, id)
 	if err != nil {
 		return nil, err
@@ -118,9 +165,9 @@ func (s *service) PatchStock(ctx context.Context, id string, req PatchStockReque
 		return nil, err
 	}
 
-	// Refresh Redis cache with the new stock and incremented version
 	if s.cache != nil {
 		_ = s.cache.Set(ctx, product)
+		_ = s.cache.InvalidateLists(ctx)
 	}
 	_ = s.producer.PublishStockChanged(ctx, *product)
 	return product, nil
@@ -133,6 +180,7 @@ func (s *service) Delete(ctx context.Context, id string) error {
 
 	if s.cache != nil {
 		_ = s.cache.Delete(ctx, id)
+		_ = s.cache.InvalidateLists(ctx)
 	}
 	return nil
 }

@@ -13,11 +13,13 @@ from app.product import (
     ErrProductNotFound,
     ErrSKUConflict,
     ErrVersionConflict,
+    PaginatedProducts,
     PatchStockRequest,
     Producer,
     Product,
     ProductService,
     Repository,
+    list_cache_key,
 )
 
 
@@ -26,6 +28,7 @@ class MockRepository(Repository):
     def __init__(self) -> None:
         self.products: dict[str, Product] = {}
         self.find_by_id_calls: int = 0
+        self.find_all_calls: int = 0
         self.force_create_err: Optional[Exception] = None
         self.force_conflict_err: bool = False
 
@@ -39,8 +42,12 @@ class MockRepository(Repository):
         self.products[str(copied.id)] = copied
         return copied.model_copy(deep=True)
 
-    async def find_all(self) -> list[Product]:
-        return [p.model_copy(deep=True) for p in self.products.values()]
+    async def find_all(self, page: int, limit: int) -> tuple[list[Product], int]:
+        self.find_all_calls += 1
+        all_items = [p.model_copy(deep=True) for p in self.products.values()]
+        total = len(all_items)
+        offset = (page - 1) * limit
+        return all_items[offset : offset + limit], total
 
     async def find_by_id(self, product_id: str) -> Product:
         self.find_by_id_calls += 1
@@ -75,6 +82,7 @@ class MockRepository(Repository):
 class MockCache(Cache):
     def __init__(self) -> None:
         self.store: dict[str, Product] = {}
+        self.list_store: dict[str, PaginatedProducts] = {}
 
     async def get(self, product_id: str) -> Optional[Product]:
         p = self.store.get(product_id)
@@ -85,6 +93,18 @@ class MockCache(Cache):
 
     async def delete(self, product_id: str) -> None:
         self.store.pop(product_id, None)
+
+    async def get_list(self, page: int, limit: int) -> Optional[PaginatedProducts]:
+        key = list_cache_key(page, limit)
+        data = self.list_store.get(key)
+        return data.model_copy(deep=True) if data is not None else None
+
+    async def set_list(self, page: int, limit: int, list_data: PaginatedProducts) -> None:
+        key = list_cache_key(page, limit)
+        self.list_store[key] = list_data.model_copy(deep=True)
+
+    async def invalidate_lists(self) -> None:
+        self.list_store.clear()
 
 
 class MockProducer(Producer):
@@ -140,7 +160,7 @@ async def test_product_service_create_duplicate_sku_fails() -> None:
 
 
 @pytest.mark.asyncio
-async def test_product_service_cache_aside_get_by_id() -> None:
+async def test_product_service_cache_aside_get_by_id_and_get_all() -> None:
     repo = MockRepository()
     cache = MockCache()
     producer = MockProducer()
@@ -156,15 +176,26 @@ async def test_product_service_cache_aside_get_by_id() -> None:
         version=1,
     )
 
-    # 1st Call: Cache Miss -> should query DB (find_by_id_calls == 1) and populate Redis cache
+    # 1st Call GetByID: Cache Miss -> queries DB and populates Redis cache
     p1 = await svc.get_by_id(str(product_id))
     assert p1.sku == "CACHE-001"
     assert repo.find_by_id_calls == 1
 
-    # 2nd Call: Cache Hit -> should return from Redis WITHOUT querying DB again (find_by_id_calls stays 1)
+    # 2nd Call GetByID: Cache Hit -> returns from Redis without querying DB
     p2 = await svc.get_by_id(str(product_id))
     assert p2.sku == "CACHE-001"
     assert repo.find_by_id_calls == 1
+
+    # 1st Call GetAll(page=1, limit=10): Cache Miss -> queries DB and caches list
+    page1 = await svc.get_all(page=1, limit=10)
+    assert page1.total == 1
+    assert page1.total_pages == 1
+    assert repo.find_all_calls == 1
+
+    # 2nd Call GetAll(page=1, limit=10): Cache Hit -> returns cached list without querying DB
+    page1_cached = await svc.get_all(page=1, limit=10)
+    assert page1_cached.total == 1
+    assert repo.find_all_calls == 1
 
 
 @pytest.mark.asyncio

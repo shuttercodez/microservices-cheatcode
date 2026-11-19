@@ -10,7 +10,7 @@ import (
 // Repository defines the data access contract for product persistence.
 type Repository interface {
 	Create(ctx context.Context, product *Product) error
-	FindAll(ctx context.Context) ([]Product, error)
+	FindAll(ctx context.Context, page, limit int) ([]Product, int64, error)
 	FindByID(ctx context.Context, id string) (*Product, error)
 	Update(ctx context.Context, product *Product) error
 	UpdateStockWithVersion(ctx context.Context, product *Product, newStock int) error
@@ -33,12 +33,22 @@ func (r *gormRepository) Create(ctx context.Context, product *Product) error {
 	return nil
 }
 
-func (r *gormRepository) FindAll(ctx context.Context) ([]Product, error) {
-	var products []Product
-	if err := r.db.WithContext(ctx).Find(&products).Error; err != nil {
-		return nil, err
+func (r *gormRepository) FindAll(ctx context.Context, page, limit int) ([]Product, int64, error) {
+	var total int64
+	if err := r.db.WithContext(ctx).Model(&Product{}).Count(&total).Error; err != nil {
+		return nil, 0, err
 	}
-	return products, nil
+
+	offset := (page - 1) * limit
+	var products []Product
+	if err := r.db.WithContext(ctx).
+		Order("created_at desc").
+		Limit(limit).
+		Offset(offset).
+		Find(&products).Error; err != nil {
+		return nil, 0, err
+	}
+	return products, total, nil
 }
 
 func (r *gormRepository) FindByID(ctx context.Context, id string) (*Product, error) {

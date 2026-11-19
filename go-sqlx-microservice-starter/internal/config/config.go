@@ -54,7 +54,16 @@ func (d DatabaseConfig) DSN() string {
 }
 
 type RedisConfig struct {
-	Addr string `yaml:"addr"`
+	Addr       string `yaml:"addr"`
+	TTLSeconds int    `yaml:"ttl_seconds"`
+}
+
+// TTL returns the configured Redis cache expiration duration.
+func (r RedisConfig) TTL() time.Duration {
+	if r.TTLSeconds <= 0 {
+		return 300 * time.Second
+	}
+	return time.Duration(r.TTLSeconds) * time.Second
 }
 
 type RabbitMQConfig struct {
@@ -112,6 +121,11 @@ func applyEnvOverrides(cfg *Config) {
 
 	if v := os.Getenv("REDIS_ADDR"); v != "" {
 		cfg.Redis.Addr = v
+	}
+	if v := os.Getenv("REDIS_TTL_SECONDS"); v != "" {
+		if ttl, err := strconv.Atoi(v); err == nil {
+			cfg.Redis.TTLSeconds = ttl
+		}
 	}
 	if v := os.Getenv("RABBITMQ_URL"); v != "" {
 		cfg.RabbitMQ.URL = v

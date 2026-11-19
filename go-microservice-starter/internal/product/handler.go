@@ -46,9 +46,12 @@ func (h *Handler) Create(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusCreated).JSON(product)
 }
 
-// GetAll handles GET requests to retrieve all products.
+// GetAll handles GET requests to retrieve a paginated list of products (?page=1&limit=10).
 func (h *Handler) GetAll(c *fiber.Ctx) error {
-	products, err := h.service.GetAll(c.UserContext())
+	page := c.QueryInt("page", 1)
+	limit := c.QueryInt("limit", 10)
+
+	products, err := h.service.GetAll(c.UserContext(), page, limit)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}

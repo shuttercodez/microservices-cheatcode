@@ -78,15 +78,16 @@ def create_app() -> FastAPI:
         # 5. Dependency Injection (Repository, Cache & Producer -> Service -> Handler)
         # --- Product Domain ---
         product_repo = product.SQLAlchemyRepository(db.session_factory)
-        product_cache = product.RedisProductCache(redis_cache)
+        product_cache = product.RedisProductCache(redis_cache, cfg.redis.ttl)
         product_producer = product.RabbitMQProducer(mq)
         product_service = product.ProductService(product_repo, product_cache, product_producer)
         product_handler = product.Handler(product_service)
 
         # --- Order Domain (Inject product_service for cross-domain stock verification and deduction) ---
         order_repo = order.SQLAlchemyRepository(db.session_factory)
+        order_cache = order.RedisOrderCache(redis_cache, cfg.redis.ttl)
         order_producer = order.RabbitMQProducer(mq)
-        order_service = order.OrderService(order_repo, product_service, order_producer)
+        order_service = order.OrderService(order_repo, order_cache, product_service, order_producer)
         order_handler = order.Handler(order_service)
 
         app_instance.include_router(product_handler.router)

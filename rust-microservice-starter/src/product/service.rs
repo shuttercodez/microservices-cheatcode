@@ -1,5 +1,7 @@
 use crate::product::cache::Cache;
-use crate::product::model::{CreateProductRequest, PatchStockRequest, Product, ProductError};
+use crate::product::model::{
+    CreateProductRequest, PaginatedProducts, PatchStockRequest, Product, ProductError,
+};
 use crate::product::producer::Producer;
 use crate::product::repository::Repository;
 use async_trait::async_trait;
@@ -11,7 +13,7 @@ use uuid::Uuid;
 #[async_trait]
 pub trait Service: Send + Sync {
     async fn create(&self, req: CreateProductRequest) -> Result<Product, ProductError>;
-    async fn get_all(&self) -> Result<Vec<Product>, ProductError>;
+    async fn get_all(&self, page: i64, limit: i64) -> Result<PaginatedProducts, ProductError>;
     async fn get_by_id(&self, id: &str) -> Result<Product, ProductError>;
     async fn update(&self, id: &str, req: CreateProductRequest) -> Result<Product, ProductError>;
     async fn patch_stock(&self, id: &str, req: PatchStockRequest) -> Result<Product, ProductError>;
@@ -34,6 +36,26 @@ pub fn new_service(
         cache,
         producer,
     })
+}
+
+fn normalize_pagination(page: i64, limit: i64) -> (i64, i64) {
+    let page = if page < 1 { 1 } else { page };
+    let limit = if limit < 1 {
+        10
+    } else if limit > 100 {
+        100
+    } else {
+        limit
+    };
+    (page, limit)
+}
+
+fn calc_total_pages(total: i64, limit: i64) -> i64 {
+    if total == 0 || limit <= 0 {
+        0
+    } else {
+        (total + limit - 1) / limit
+    }
 }
 
 #[async_trait]
@@ -60,14 +82,35 @@ impl Service for ProductService {
 
         if let Some(ref cache) = self.cache {
             let _ = cache.set(&product).await;
+            let _ = cache.invalidate_lists().await;
         }
         let _ = self.producer.publish_stock_changed(&product).await;
 
         Ok(product)
     }
 
-    async fn get_all(&self) -> Result<Vec<Product>, ProductError> {
-        self.repo.find_all().await
+    async fn get_all(&self, page: i64, limit: i64) -> Result<PaginatedProducts, ProductError> {
+        let (page, limit) = normalize_pagination(page, limit);
+
+        if let Some(ref cache) = self.cache {
+            if let Ok(Some(cached)) = cache.get_list(page, limit).await {
+                return Ok(cached);
+            }
+        }
+
+        let (products, total) = self.repo.find_all(page, limit).await?;
+        let res = PaginatedProducts {
+            data: products,
+            page,
+            limit,
+            total,
+            total_pages: calc_total_pages(total, limit),
+        };
+
+        if let Some(ref cache) = self.cache {
+            let _ = cache.set_list(page, limit, &res).await;
+        }
+        Ok(res)
     }
 
     /// Implements the Cache-Aside pattern: check Redis first, fallback to DB on miss, and populate Redis.
@@ -103,6 +146,7 @@ impl Service for ProductService {
 
         if let Some(ref cache) = self.cache {
             let _ = cache.set(&product).await;
+            let _ = cache.invalidate_lists().await;
         }
         let _ = self.producer.publish_stock_changed(&product).await;
 
@@ -128,6 +172,7 @@ impl Service for ProductService {
         // Refresh Redis cache with the new stock and incremented version
         if let Some(ref cache) = self.cache {
             let _ = cache.set(&product).await;
+            let _ = cache.invalidate_lists().await;
         }
         let _ = self.producer.publish_stock_changed(&product).await;
 
@@ -139,6 +184,7 @@ impl Service for ProductService {
 
         if let Some(ref cache) = self.cache {
             let _ = cache.delete(id).await;
+            let _ = cache.invalidate_lists().await;
         }
         Ok(())
     }
@@ -147,6 +193,7 @@ impl Service for ProductService {
 #[cfg(test)]
 pub mod tests {
     use super::*;
+    use crate::product::cache::list_cache_key;
     use std::collections::HashMap;
     use std::sync::atomic::{AtomicUsize, Ordering};
     use tokio::sync::RwLock;
@@ -186,9 +233,15 @@ pub mod tests {
             Ok(())
         }
 
-        async fn find_all(&self) -> Result<Vec<Product>, ProductError> {
+        async fn find_all(
+            &self,
+            _page: i64,
+            _limit: i64,
+        ) -> Result<(Vec<Product>, i64), ProductError> {
             let map = self.products.read().await;
-            Ok(map.values().cloned().collect())
+            let list: Vec<Product> = map.values().cloned().collect();
+            let total = list.len() as i64;
+            Ok((list, total))
         }
 
         async fn find_by_id(&self, id: &str) -> Result<Product, ProductError> {
@@ -239,12 +292,14 @@ pub mod tests {
 
     pub struct MockCache {
         pub store: RwLock<HashMap<String, Product>>,
+        pub list_store: RwLock<HashMap<String, PaginatedProducts>>,
     }
 
     impl MockCache {
         pub fn new() -> Arc<Self> {
             Arc::new(Self {
                 store: RwLock::new(HashMap::new()),
+                list_store: RwLock::new(HashMap::new()),
             })
         }
     }
@@ -265,6 +320,27 @@ pub mod tests {
 
         async fn delete(&self, id: &str) -> anyhow::Result<()> {
             self.store.write().await.remove(id);
+            Ok(())
+        }
+
+        async fn get_list(&self, page: i64, limit: i64) -> anyhow::Result<Option<PaginatedProducts>> {
+            let key = list_cache_key(page, limit);
+            Ok(self.list_store.read().await.get(&key).cloned())
+        }
+
+        async fn set_list(
+            &self,
+            page: i64,
+            limit: i64,
+            list: &PaginatedProducts,
+        ) -> anyhow::Result<()> {
+            let key = list_cache_key(page, limit);
+            self.list_store.write().await.insert(key, list.clone());
+            Ok(())
+        }
+
+        async fn invalidate_lists(&self) -> anyhow::Result<()> {
+            self.list_store.write().await.clear();
             Ok(())
         }
     }

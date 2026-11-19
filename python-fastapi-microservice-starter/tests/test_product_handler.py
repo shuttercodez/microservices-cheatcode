@@ -36,7 +36,16 @@ async def test_product_handler_endpoints() -> None:
         resp = await client.get(f"/api/v1/products/{created_id}")
         assert resp.status_code == 200
 
-        # 3. PATCH /api/v1/products/:id/stock - updates product stock (200 OK)
+        # 3. GET /api/v1/products/?page=1&limit=10 - retrieves paginated product list (200 OK)
+        resp = await client.get("/api/v1/products/?page=1&limit=10")
+        assert resp.status_code == 200
+        paginated = resp.json()
+        assert paginated["page"] == 1
+        assert paginated["limit"] == 10
+        assert paginated["total"] == 1
+        assert len(paginated["data"]) == 1
+
+        # 4. PATCH /api/v1/products/:id/stock - updates product stock (200 OK)
         resp = await client.patch(
             f"/api/v1/products/{created_id}/stock",
             json={"stock": 45},

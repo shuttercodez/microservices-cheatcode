@@ -8,7 +8,7 @@ use uuid::Uuid;
 #[async_trait]
 pub trait Repository: Send + Sync {
     async fn create(&self, order: &mut Order) -> Result<(), OrderError>;
-    async fn find_all(&self) -> Result<Vec<Order>, OrderError>;
+    async fn find_all(&self, page: i64, limit: i64) -> Result<(Vec<Order>, i64), OrderError>;
     async fn find_by_id(&self, id: &str) -> Result<Order, OrderError>;
 }
 
@@ -42,20 +42,30 @@ impl Repository for SqlxRepository {
         Ok(())
     }
 
-    async fn find_all(&self) -> Result<Vec<Order>, OrderError> {
+    async fn find_all(&self, page: i64, limit: i64) -> Result<(Vec<Order>, i64), OrderError> {
+        let (total,): (i64,) =
+            sqlx::query_as("SELECT COUNT(*) FROM orders WHERE deleted_at IS NULL")
+                .fetch_one(&self.db)
+                .await
+                .map_err(|e| OrderError::Internal(e.to_string()))?;
+
+        let offset = (page - 1) * limit;
         let orders: Vec<Order> = sqlx::query_as(
             r#"
             SELECT id, product_id, quantity, total_price::float8 AS total_price, status, created_at, updated_at, deleted_at
             FROM orders
             WHERE deleted_at IS NULL
             ORDER BY created_at DESC
+            LIMIT $1 OFFSET $2
             "#,
         )
+        .bind(limit)
+        .bind(offset)
         .fetch_all(&self.db)
         .await
         .map_err(|e| OrderError::Internal(e.to_string()))?;
 
-        Ok(orders)
+        Ok((orders, total))
     }
 
     async fn find_by_id(&self, id: &str) -> Result<Order, OrderError> {

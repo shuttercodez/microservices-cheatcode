@@ -35,12 +35,13 @@ func (m *mockRepository) Create(ctx context.Context, product *Product) error {
 	return nil
 }
 
-func (m *mockRepository) FindAll(ctx context.Context) ([]Product, error) {
+func (m *mockRepository) FindAll(ctx context.Context, page, limit int) ([]Product, int64, error) {
+	m.findByIDCalls++
 	var list []Product
 	for _, p := range m.products {
 		list = append(list, *p)
 	}
-	return list, nil
+	return list, int64(len(list)), nil
 }
 
 func (m *mockRepository) FindByID(ctx context.Context, id string) (*Product, error) {
@@ -88,12 +89,14 @@ func (m *mockRepository) Delete(ctx context.Context, id string) error {
 
 // mockCache simulates a Redis cache in memory.
 type mockCache struct {
-	store map[string]*Product
+	store     map[string]*Product
+	listStore map[string]*PaginatedProducts
 }
 
 func newMockCache() *mockCache {
 	return &mockCache{
-		store: make(map[string]*Product),
+		store:     make(map[string]*Product),
+		listStore: make(map[string]*PaginatedProducts),
 	}
 }
 
@@ -114,6 +117,28 @@ func (m *mockCache) Set(ctx context.Context, product *Product) error {
 
 func (m *mockCache) Delete(ctx context.Context, id string) error {
 	delete(m.store, id)
+	return nil
+}
+
+func (m *mockCache) GetList(ctx context.Context, page, limit int) (*PaginatedProducts, error) {
+	key := listCacheKey(page, limit)
+	list, ok := m.listStore[key]
+	if !ok {
+		return nil, nil
+	}
+	copied := *list
+	return &copied, nil
+}
+
+func (m *mockCache) SetList(ctx context.Context, page, limit int, list *PaginatedProducts) error {
+	key := listCacheKey(page, limit)
+	copied := *list
+	m.listStore[key] = &copied
+	return nil
+}
+
+func (m *mockCache) InvalidateLists(ctx context.Context) error {
+	m.listStore = make(map[string]*PaginatedProducts)
 	return nil
 }
 

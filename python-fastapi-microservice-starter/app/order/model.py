@@ -84,6 +84,14 @@ class Order(BaseModel):
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
+class PaginatedOrders(BaseModel):
+    data: list[Order]
+    page: int
+    limit: int
+    total: int
+    total_pages: int
+
+
 class CreateOrderRequest(BaseModel):
     product_id: str = ""
     quantity: int = 0

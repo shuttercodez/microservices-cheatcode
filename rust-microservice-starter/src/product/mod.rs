@@ -10,8 +10,8 @@ pub use cache::{new_cache, Cache};
 pub use consumer::start_queue_consumer;
 pub use handler::Handler;
 pub use model::{
-    CreateProductRequest, PatchStockRequest, Product, ProductError, StockChangedEvent,
-    QUEUE_STOCK_CHANGED,
+    CreateProductRequest, PaginatedProducts, PatchStockRequest, Product, ProductError,
+    StockChangedEvent, QUEUE_STOCK_CHANGED,
 };
 pub use producer::{new_producer, Producer};
 pub use repository::{new_repository, Repository};

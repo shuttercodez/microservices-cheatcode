@@ -11,7 +11,7 @@ import (
 // Repository defines the data access contract for order persistence.
 type Repository interface {
 	Create(ctx context.Context, order *Order) error
-	FindAll(ctx context.Context) ([]Order, error)
+	FindAll(ctx context.Context, page, limit int) ([]Order, int64, error)
 	FindByID(ctx context.Context, id string) (*Order, error)
 }
 
@@ -41,18 +41,26 @@ func (r *sqlxRepository) Create(ctx context.Context, order *Order) error {
 	)
 }
 
-func (r *sqlxRepository) FindAll(ctx context.Context) ([]Order, error) {
+func (r *sqlxRepository) FindAll(ctx context.Context, page, limit int) ([]Order, int64, error) {
+	const countQuery = `SELECT COUNT(*) FROM orders WHERE deleted_at IS NULL`
+	var total int64
+	if err := r.db.GetContext(ctx, &total, countQuery); err != nil {
+		return nil, 0, err
+	}
+
 	const query = `
 		SELECT id, product_id, quantity, total_price, status, created_at, updated_at, deleted_at
 		FROM orders
 		WHERE deleted_at IS NULL
 		ORDER BY created_at DESC
+		LIMIT $1 OFFSET $2
 	`
+	offset := (page - 1) * limit
 	orders := make([]Order, 0)
-	if err := r.db.SelectContext(ctx, &orders, query); err != nil {
-		return nil, err
+	if err := r.db.SelectContext(ctx, &orders, query, limit, offset); err != nil {
+		return nil, 0, err
 	}
-	return orders, nil
+	return orders, total, nil
 }
 
 func (r *sqlxRepository) FindByID(ctx context.Context, id string) (*Order, error) {

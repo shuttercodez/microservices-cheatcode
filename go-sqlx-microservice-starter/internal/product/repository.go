@@ -12,7 +12,7 @@ import (
 // Repository defines the data access contract for product persistence.
 type Repository interface {
 	Create(ctx context.Context, product *Product) error
-	FindAll(ctx context.Context) ([]Product, error)
+	FindAll(ctx context.Context, page, limit int) ([]Product, int64, error)
 	FindByID(ctx context.Context, id string) (*Product, error)
 	Update(ctx context.Context, product *Product) error
 	UpdateStockWithVersion(ctx context.Context, product *Product, newStock int) error
@@ -40,17 +40,26 @@ func (r *sqlxRepository) Create(ctx context.Context, product *Product) error {
 	return nil
 }
 
-func (r *sqlxRepository) FindAll(ctx context.Context) ([]Product, error) {
+func (r *sqlxRepository) FindAll(ctx context.Context, page, limit int) ([]Product, int64, error) {
+	const countQuery = `SELECT COUNT(*) FROM products WHERE deleted_at IS NULL`
+	var total int64
+	if err := r.db.GetContext(ctx, &total, countQuery); err != nil {
+		return nil, 0, err
+	}
+
 	const query = `
 		SELECT id, sku, name, price, stock, version, created_at, updated_at, deleted_at
 		FROM products
 		WHERE deleted_at IS NULL
+		ORDER BY created_at DESC
+		LIMIT $1 OFFSET $2
 	`
+	offset := (page - 1) * limit
 	products := make([]Product, 0)
-	if err := r.db.SelectContext(ctx, &products, query); err != nil {
-		return nil, err
+	if err := r.db.SelectContext(ctx, &products, query, limit, offset); err != nil {
+		return nil, 0, err
 	}
-	return products, nil
+	return products, total, nil
 }
 
 func (r *sqlxRepository) FindByID(ctx context.Context, id string) (*Product, error) {

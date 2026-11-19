@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Query, status
 from fastapi.responses import JSONResponse
 
 from app.order.model import (
@@ -43,9 +43,9 @@ class Handler:
                 content={"error": str(exc)},
             )
 
-    async def get_all(self):
+    async def get_all(self, page: int = Query(1), limit: int = Query(10)):
         try:
-            return await self.service.get_all_orders()
+            return await self.service.get_all_orders(page, limit)
         except Exception as exc:
             return JSONResponse(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

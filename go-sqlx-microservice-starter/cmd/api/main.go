@@ -78,15 +78,16 @@ func main() {
 	// 5. Dependency Injection (Repository, Cache & Producer -> Service -> Handler)
 	// --- Product Domain ---
 	productRepo := product.NewRepository(db)
-	productCache := product.NewCache(redisCache)
+	productCache := product.NewCache(redisCache, cfg.Redis.TTL())
 	productProducer := product.NewProducer(mq)
 	productService := product.NewService(productRepo, productCache, productProducer)
 	productHandler := product.NewHandler(productService)
 
 	// --- Order Domain (Inject productService for cross-domain stock verification and deduction) ---
 	orderRepo := order.NewRepository(db)
+	orderCache := order.NewCache(redisCache, cfg.Redis.TTL())
 	orderProducer := order.NewProducer(mq)
-	orderService := order.NewService(orderRepo, productService, orderProducer)
+	orderService := order.NewService(orderRepo, orderCache, productService, orderProducer)
 	orderHandler := order.NewHandler(orderService)
 
 	// 6. Configure Fiber application

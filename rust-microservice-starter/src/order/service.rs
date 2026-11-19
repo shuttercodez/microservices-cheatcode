@@ -1,4 +1,5 @@
-use crate::order::model::{CreateOrderRequest, Order, OrderError};
+use crate::order::cache::Cache;
+use crate::order::model::{CreateOrderRequest, Order, OrderError, PaginatedOrders};
 use crate::order::producer::Producer;
 use crate::order::repository::Repository;
 use crate::product::{self, PatchStockRequest};
@@ -11,31 +12,54 @@ use uuid::Uuid;
 #[async_trait]
 pub trait Service: Send + Sync {
     async fn create_order(&self, req: CreateOrderRequest) -> Result<Order, OrderError>;
-    async fn get_all_orders(&self) -> Result<Vec<Order>, OrderError>;
+    async fn get_all_orders(&self, page: i64, limit: i64) -> Result<PaginatedOrders, OrderError>;
     async fn get_order_by_id(&self, id: &str) -> Result<Order, OrderError>;
 }
 
 pub struct OrderService {
     order_repo: Arc<dyn Repository>,
+    order_cache: Option<Arc<dyn Cache>>,
     product_service: Arc<dyn product::Service>,
     producer: Arc<dyn Producer>,
 }
 
 pub fn new_service(
     order_repo: Arc<dyn Repository>,
+    order_cache: Option<Arc<dyn Cache>>,
     product_service: Arc<dyn product::Service>,
     producer: Arc<dyn Producer>,
 ) -> Arc<dyn Service> {
     Arc::new(OrderService {
         order_repo,
+        order_cache,
         product_service,
         producer,
     })
 }
 
+fn normalize_pagination(page: i64, limit: i64) -> (i64, i64) {
+    let page = if page < 1 { 1 } else { page };
+    let limit = if limit < 1 {
+        10
+    } else if limit > 100 {
+        100
+    } else {
+        limit
+    };
+    (page, limit)
+}
+
+fn calc_total_pages(total: i64, limit: i64) -> i64 {
+    if total == 0 || limit <= 0 {
+        0
+    } else {
+        (total + limit - 1) / limit
+    }
+}
+
 #[async_trait]
 impl Service for OrderService {
-    /// Verifies product availability, deducts stock via ProductService, persists the order, and publishes an event.
+    /// Verifies product availability, deducts stock via ProductService, persists the order, caches it, and publishes an event.
     async fn create_order(&self, req: CreateOrderRequest) -> Result<Order, OrderError> {
         if req.product_id.is_empty() || req.quantity <= 0 {
             return Err(OrderError::InvalidInput);
@@ -69,25 +93,63 @@ impl Service for OrderService {
 
         self.order_repo.create(&mut order).await?;
 
-        // 4. Publish order created event to RabbitMQ
+        // 4. Populate Redis cache and invalidate cached order lists
+        if let Some(ref cache) = self.order_cache {
+            let _ = cache.set(&order).await;
+            let _ = cache.invalidate_lists().await;
+        }
+
+        // 5. Publish order created event to RabbitMQ
         let _ = self.producer.publish_order_created(&order).await;
 
         Ok(order)
     }
 
-    async fn get_all_orders(&self) -> Result<Vec<Order>, OrderError> {
-        self.order_repo.find_all().await
+    async fn get_all_orders(&self, page: i64, limit: i64) -> Result<PaginatedOrders, OrderError> {
+        let (page, limit) = normalize_pagination(page, limit);
+
+        if let Some(ref cache) = self.order_cache {
+            if let Ok(Some(cached)) = cache.get_list(page, limit).await {
+                return Ok(cached);
+            }
+        }
+
+        let (orders, total) = self.order_repo.find_all(page, limit).await?;
+        let res = PaginatedOrders {
+            data: orders,
+            page,
+            limit,
+            total,
+            total_pages: calc_total_pages(total, limit),
+        };
+
+        if let Some(ref cache) = self.order_cache {
+            let _ = cache.set_list(page, limit, &res).await;
+        }
+        Ok(res)
     }
 
     async fn get_order_by_id(&self, id: &str) -> Result<Order, OrderError> {
-        self.order_repo.find_by_id(id).await
+        if let Some(ref cache) = self.order_cache {
+            if let Ok(Some(cached)) = cache.get(id).await {
+                return Ok(cached);
+            }
+        }
+
+        let order = self.order_repo.find_by_id(id).await?;
+
+        if let Some(ref cache) = self.order_cache {
+            let _ = cache.set(&order).await;
+        }
+        Ok(order)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::product::{CreateProductRequest, Product, ProductError};
+    use crate::order::cache::list_cache_key;
+    use crate::product::{CreateProductRequest, PaginatedProducts, Product, ProductError};
     use std::collections::HashMap;
     use std::sync::atomic::{AtomicBool, Ordering};
     use tokio::sync::RwLock;
@@ -117,8 +179,14 @@ mod tests {
             Ok(())
         }
 
-        async fn find_all(&self) -> Result<Vec<Order>, OrderError> {
-            Ok(self.orders.read().await.values().cloned().collect())
+        async fn find_all(
+            &self,
+            _page: i64,
+            _limit: i64,
+        ) -> Result<(Vec<Order>, i64), OrderError> {
+            let list: Vec<Order> = self.orders.read().await.values().cloned().collect();
+            let total = list.len() as i64;
+            Ok((list, total))
         }
 
         async fn find_by_id(&self, id: &str) -> Result<Order, OrderError> {
@@ -128,6 +196,56 @@ mod tests {
                 .get(id)
                 .cloned()
                 .ok_or(OrderError::NotFound)
+        }
+    }
+
+    struct MockOrderCache {
+        store: RwLock<HashMap<String, Order>>,
+        list_store: RwLock<HashMap<String, PaginatedOrders>>,
+    }
+
+    impl MockOrderCache {
+        fn new() -> Arc<Self> {
+            Arc::new(Self {
+                store: RwLock::new(HashMap::new()),
+                list_store: RwLock::new(HashMap::new()),
+            })
+        }
+    }
+
+    #[async_trait]
+    impl Cache for MockOrderCache {
+        async fn get(&self, id: &str) -> anyhow::Result<Option<Order>> {
+            Ok(self.store.read().await.get(id).cloned())
+        }
+
+        async fn set(&self, order: &Order) -> anyhow::Result<()> {
+            self.store
+                .write()
+                .await
+                .insert(order.id.to_string(), order.clone());
+            Ok(())
+        }
+
+        async fn get_list(&self, page: i64, limit: i64) -> anyhow::Result<Option<PaginatedOrders>> {
+            let key = list_cache_key(page, limit);
+            Ok(self.list_store.read().await.get(&key).cloned())
+        }
+
+        async fn set_list(
+            &self,
+            page: i64,
+            limit: i64,
+            list: &PaginatedOrders,
+        ) -> anyhow::Result<()> {
+            let key = list_cache_key(page, limit);
+            self.list_store.write().await.insert(key, list.clone());
+            Ok(())
+        }
+
+        async fn invalidate_lists(&self) -> anyhow::Result<()> {
+            self.list_store.write().await.clear();
+            Ok(())
         }
     }
 
@@ -153,8 +271,18 @@ mod tests {
             Err(ProductError::NotFound)
         }
 
-        async fn get_all(&self) -> Result<Vec<Product>, ProductError> {
-            Ok(vec![])
+        async fn get_all(
+            &self,
+            _page: i64,
+            _limit: i64,
+        ) -> Result<PaginatedProducts, ProductError> {
+            Ok(PaginatedProducts {
+                data: vec![],
+                page: 1,
+                limit: 10,
+                total: 0,
+                total_pages: 0,
+            })
         }
 
         async fn get_by_id(&self, id: &str) -> Result<Product, ProductError> {
@@ -220,9 +348,10 @@ mod tests {
         let product_id = Uuid::new_v4();
         let now = Utc::now();
 
-        // 1. Success - creates order, deducts product stock, calculates total price, and publishes event
+        // 1. Success - creates order, deducts product stock, calculates total price, caches it, and publishes event
         {
             let order_repo = MockOrderRepository::new();
+            let order_cache = MockOrderCache::new();
             let prod_svc = MockProductService::new();
             let producer = MockOrderProducer::new();
 
@@ -241,7 +370,12 @@ mod tests {
                 },
             );
 
-            let svc = new_service(order_repo, prod_svc.clone(), producer.clone());
+            let svc = new_service(
+                order_repo,
+                Some(order_cache.clone()),
+                prod_svc.clone(),
+                producer.clone(),
+            );
 
             let order = svc
                 .create_order(CreateOrderRequest {
@@ -262,12 +396,14 @@ mod tests {
                     .stock,
                 7
             );
+            assert!(order_cache.get(&order.id.to_string()).await.unwrap().is_some());
             assert_eq!(producer.published_orders.read().await.len(), 1);
         }
 
         // 2. Fail - ordering more than available stock returns InsufficientStock without deducting stock
         {
             let order_repo = MockOrderRepository::new();
+            let order_cache = MockOrderCache::new();
             let prod_svc = MockProductService::new();
             let producer = MockOrderProducer::new();
 
@@ -286,7 +422,7 @@ mod tests {
                 },
             );
 
-            let svc = new_service(order_repo, prod_svc.clone(), producer.clone());
+            let svc = new_service(order_repo, Some(order_cache), prod_svc.clone(), producer.clone());
 
             let err = svc
                 .create_order(CreateOrderRequest {
@@ -304,9 +440,10 @@ mod tests {
         // 3. Fail - non-existent product returns ProductError::NotFound
         {
             let order_repo = MockOrderRepository::new();
+            let order_cache = MockOrderCache::new();
             let prod_svc = MockProductService::new();
             let producer = MockOrderProducer::new();
-            let svc = new_service(order_repo, prod_svc, producer);
+            let svc = new_service(order_repo, Some(order_cache), prod_svc, producer);
 
             let err = svc
                 .create_order(CreateOrderRequest {

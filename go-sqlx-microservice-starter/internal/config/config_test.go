@@ -26,6 +26,7 @@ database:
   ssl_mode: "require"
 redis:
   addr: "redis.internal:6379"
+  ttl_seconds: 600
 rabbitmq:
   url: "amqp://yaml:yaml@mq.internal:5672/"
 `

@@ -31,6 +31,15 @@ type Product struct {
 	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
+// PaginatedProducts represents a paginated list response for products.
+type PaginatedProducts struct {
+	Data       []Product `json:"data"`
+	Page       int       `json:"page"`
+	Limit      int       `json:"limit"`
+	Total      int64     `json:"total"`
+	TotalPages int       `json:"total_pages"`
+}
+
 // CreateProductRequest represents the request DTO for creating or replacing a product (POST / PUT).
 type CreateProductRequest struct {
 	SKU   string  `json:"sku"`

@@ -36,6 +36,16 @@ pub struct Product {
     pub deleted_at: Option<DateTime<Utc>>,
 }
 
+/// PaginatedProducts represents a paginated list response for products.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct PaginatedProducts {
+    pub data: Vec<Product>,
+    pub page: i64,
+    pub limit: i64,
+    pub total: i64,
+    pub total_pages: i64,
+}
+
 /// CreateProductRequest represents the request DTO for creating or replacing a product (POST / PUT).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateProductRequest {

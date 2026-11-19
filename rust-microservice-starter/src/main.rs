@@ -91,15 +91,17 @@ async fn main() {
     // 5. Dependency Injection (Repository, Cache & Producer -> Service -> Handler)
     // --- Product Domain ---
     let product_repo = product::new_repository(db.clone());
-    let product_cache = product::new_cache(Some(redis_cache.clone()));
+    let product_cache = product::new_cache(Some(redis_cache.clone()), cfg.redis.ttl());
     let product_producer = product::new_producer(Some(mq.clone()));
     let product_service = product::new_service(product_repo, Some(product_cache), product_producer);
     let product_handler = product::Handler::new(product_service.clone());
 
     // --- Order Domain (Inject product_service for cross-domain stock verification and deduction) ---
     let order_repo = order::new_repository(db.clone());
+    let order_cache = order::new_cache(Some(redis_cache.clone()), cfg.redis.ttl());
     let order_producer = order::new_producer(Some(mq.clone()));
-    let order_service = order::new_service(order_repo, product_service, order_producer);
+    let order_service =
+        order::new_service(order_repo, Some(order_cache), product_service, order_producer);
     let order_handler = order::Handler::new(order_service);
 
     // 6. Configure Axum application

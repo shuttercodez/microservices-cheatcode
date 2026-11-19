@@ -4,7 +4,7 @@ import uuid
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.order.model import ErrOrderNotFound, Order, OrderModel
@@ -18,7 +18,7 @@ class Repository(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def find_all(self) -> list[Order]:
+    async def find_all(self, page: int, limit: int) -> tuple[list[Order], int]:
         raise NotImplementedError
 
     @abstractmethod
@@ -49,16 +49,26 @@ class SQLAlchemyRepository(Repository):
             await session.refresh(entity)
             return Order.model_validate(entity)
 
-    async def find_all(self) -> list[Order]:
+    async def find_all(self, page: int, limit: int) -> tuple[list[Order], int]:
+        offset = (page - 1) * limit
         async with self._session_factory() as session:
+            count_stmt = (
+                select(func.count())
+                .select_from(OrderModel)
+                .where(OrderModel.deleted_at.is_(None))
+            )
+            total = int((await session.execute(count_stmt)).scalar_one())
+
             stmt = (
                 select(OrderModel)
                 .where(OrderModel.deleted_at.is_(None))
                 .order_by(OrderModel.created_at.desc())
+                .limit(limit)
+                .offset(offset)
             )
             result = await session.execute(stmt)
             rows = result.scalars().all()
-            return [Order.model_validate(row) for row in rows]
+            return [Order.model_validate(row) for row in rows], total
 
     async def find_by_id(self, order_id: str) -> Order:
         try:
