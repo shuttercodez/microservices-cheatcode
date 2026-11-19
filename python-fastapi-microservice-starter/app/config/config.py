@@ -5,14 +5,14 @@ from pathlib import Path
 from typing import Union
 
 import yaml
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 
 class AppConfig(BaseModel):
-    name: str = "inventory-order-service"
-    env: str = "development"
-    port: int = 8080
-    shutdown_timeout_seconds: int = 5
+    name: str
+    env: str
+    port: int
+    shutdown_timeout_seconds: int
 
     @property
     def shutdown_timeout(self) -> int:
@@ -20,12 +20,12 @@ class AppConfig(BaseModel):
 
 
 class DatabaseConfig(BaseModel):
-    host: str = "localhost"
-    port: int = 5432
-    user: str = "appuser"
-    password: str = "apppassword"
-    name: str = "inventory_db"
-    ssl_mode: str = "disable"
+    host: str
+    port: int
+    user: str
+    password: str
+    name: str
+    ssl_mode: str
 
     def dsn(self) -> str:
         """Builds the PostgreSQL connection URI for SQLAlchemy + asyncpg.
@@ -38,18 +38,18 @@ class DatabaseConfig(BaseModel):
 
 
 class RedisConfig(BaseModel):
-    addr: str = "localhost:6379"
+    addr: str
 
 
 class RabbitMQConfig(BaseModel):
-    url: str = "amqp://guest:guest@localhost:5672/"
+    url: str
 
 
 class Config(BaseModel):
-    app: AppConfig = Field(default_factory=AppConfig)
-    database: DatabaseConfig = Field(default_factory=DatabaseConfig)
-    redis: RedisConfig = Field(default_factory=RedisConfig)
-    rabbitmq: RabbitMQConfig = Field(default_factory=RabbitMQConfig)
+    app: AppConfig
+    database: DatabaseConfig
+    redis: RedisConfig
+    rabbitmq: RabbitMQConfig
 
     @classmethod
     def load(cls, path: Union[str, Path]) -> Config:

@@ -6,50 +6,18 @@ use std::time::Duration;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Config {
-    #[serde(default)]
     pub app: AppConfig,
-    #[serde(default)]
     pub database: DatabaseConfig,
-    #[serde(default)]
     pub redis: RedisConfig,
-    #[serde(default)]
     pub rabbitmq: RabbitMQConfig,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct AppConfig {
-    #[serde(default = "default_app_name")]
     pub name: String,
-    #[serde(default = "default_app_env")]
     pub env: String,
-    #[serde(default = "default_app_port")]
     pub port: u16,
-    #[serde(default = "default_shutdown_timeout")]
     pub shutdown_timeout_seconds: u64,
-}
-
-fn default_app_name() -> String {
-    "inventory-order-service".to_string()
-}
-fn default_app_env() -> String {
-    "development".to_string()
-}
-fn default_app_port() -> u16 {
-    8080
-}
-fn default_shutdown_timeout() -> u64 {
-    5
-}
-
-impl Default for AppConfig {
-    fn default() -> Self {
-        Self {
-            name: default_app_name(),
-            env: default_app_env(),
-            port: default_app_port(),
-            shutdown_timeout_seconds: default_shutdown_timeout(),
-        }
-    }
 }
 
 impl AppConfig {
@@ -64,50 +32,12 @@ impl AppConfig {
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct DatabaseConfig {
-    #[serde(default = "default_db_host")]
     pub host: String,
-    #[serde(default = "default_db_port")]
     pub port: u16,
-    #[serde(default = "default_db_user")]
     pub user: String,
-    #[serde(default = "default_db_password")]
     pub password: String,
-    #[serde(default = "default_db_name")]
     pub name: String,
-    #[serde(default = "default_db_ssl_mode")]
     pub ssl_mode: String,
-}
-
-fn default_db_host() -> String {
-    "localhost".to_string()
-}
-fn default_db_port() -> u16 {
-    5432
-}
-fn default_db_user() -> String {
-    "appuser".to_string()
-}
-fn default_db_password() -> String {
-    "apppassword".to_string()
-}
-fn default_db_name() -> String {
-    "inventory_db".to_string()
-}
-fn default_db_ssl_mode() -> String {
-    "disable".to_string()
-}
-
-impl Default for DatabaseConfig {
-    fn default() -> Self {
-        Self {
-            host: default_db_host(),
-            port: default_db_port(),
-            user: default_db_user(),
-            password: default_db_password(),
-            name: default_db_name(),
-            ssl_mode: default_db_ssl_mode(),
-        }
-    }
 }
 
 impl DatabaseConfig {
@@ -128,49 +58,12 @@ impl DatabaseConfig {
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct RedisConfig {
-    #[serde(default = "default_redis_addr")]
     pub addr: String,
-}
-
-fn default_redis_addr() -> String {
-    "localhost:6379".to_string()
-}
-
-impl Default for RedisConfig {
-    fn default() -> Self {
-        Self {
-            addr: default_redis_addr(),
-        }
-    }
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct RabbitMQConfig {
-    #[serde(default = "default_rabbitmq_url")]
     pub url: String,
-}
-
-fn default_rabbitmq_url() -> String {
-    "amqp://guest:guest@localhost:5672/".to_string()
-}
-
-impl Default for RabbitMQConfig {
-    fn default() -> Self {
-        Self {
-            url: default_rabbitmq_url(),
-        }
-    }
-}
-
-impl Default for Config {
-    fn default() -> Self {
-        Self {
-            app: AppConfig::default(),
-            database: DatabaseConfig::default(),
-            redis: RedisConfig::default(),
-            rabbitmq: RabbitMQConfig::default(),
-        }
-    }
 }
 
 impl Config {
@@ -285,7 +178,8 @@ rabbitmq:
         env::set_var("DB_PASSWORD", "vault_super_secret_pw");
         env::set_var("REDIS_ADDR", "prod-redis.cache.windows.net:6380");
 
-        let cfg_overridden = Config::load(tmp_file.path()).expect("unexpected error loading config");
+        let cfg_overridden =
+            Config::load(tmp_file.path()).expect("unexpected error loading config");
         assert_eq!(cfg_overridden.database.password, "vault_super_secret_pw");
         assert_eq!(
             cfg_overridden.redis.addr,

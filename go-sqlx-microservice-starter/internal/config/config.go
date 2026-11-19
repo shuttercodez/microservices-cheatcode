@@ -41,7 +41,7 @@ type DatabaseConfig struct {
 	SSLMode  string `yaml:"ssl_mode"`
 }
 
-// DSN builds the PostgreSQL connection string for GORM.
+// DSN builds the PostgreSQL connection string.
 // If DB_DSN is explicitly provided by a Cloud Vault, it takes highest precedence.
 func (d DatabaseConfig) DSN() string {
 	if envDSN := os.Getenv("DB_DSN"); envDSN != "" {
@@ -64,44 +64,18 @@ type RabbitMQConfig struct {
 // Load reads the YAML configuration file from the given path and applies environment variable
 // overrides (used when deploying with AWS Secrets Manager, Azure Key Vault, or HashiCorp Vault).
 func Load(path string) (*Config, error) {
-	cfg := defaultConfig()
-
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read config file %s: %w", path, err)
 	}
 
-	if err := yaml.Unmarshal(data, cfg); err != nil {
+	var cfg Config
+	if err := yaml.Unmarshal(data, &cfg); err != nil {
 		return nil, fmt.Errorf("failed to parse yaml config: %w", err)
 	}
 
-	applyEnvOverrides(cfg)
-	return cfg, nil
-}
-
-func defaultConfig() *Config {
-	return &Config{
-		App: AppConfig{
-			Name:                   "inventory-order-service",
-			Env:                    "development",
-			Port:                   8080,
-			ShutdownTimeoutSeconds: 5,
-		},
-		Database: DatabaseConfig{
-			Host:     "localhost",
-			Port:     5432,
-			User:     "appuser",
-			Password: "apppassword",
-			Name:     "inventory_db",
-			SSLMode:  "disable",
-		},
-		Redis: RedisConfig{
-			Addr: "localhost:6379",
-		},
-		RabbitMQ: RabbitMQConfig{
-			URL: "amqp://guest:guest@localhost:5672/",
-		},
-	}
+	applyEnvOverrides(&cfg)
+	return &cfg, nil
 }
 
 // applyEnvOverrides allows Cloud Secret Managers / Vaults to override YAML values via standard env vars.
