@@ -34,6 +34,16 @@ pub struct Order {
     pub deleted_at: Option<DateTime<Utc>>,
 }
 
+/// PaginatedOrders represents a paginated list response for orders.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct PaginatedOrders {
+    pub data: Vec<Order>,
+    pub page: i64,
+    pub limit: i64,
+    pub total: i64,
+    pub total_pages: i64,
+}
+
 /// CreateOrderRequest represents the request DTO for creating a new order (POST /api/v1/orders).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreateOrderRequest {

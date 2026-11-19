@@ -2,13 +2,29 @@ use crate::order::model::{CreateOrderRequest, OrderError};
 use crate::order::service::Service;
 use crate::product::ProductError;
 use axum::extract::rejection::JsonRejection;
-use axum::extract::{Path, State};
+use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::routing::get;
 use axum::{Json, Router};
+use serde::Deserialize;
 use serde_json::json;
 use std::sync::Arc;
+
+#[derive(Debug, Deserialize)]
+pub struct PaginationQuery {
+    #[serde(default = "default_page")]
+    pub page: i64,
+    #[serde(default = "default_limit")]
+    pub limit: i64,
+}
+
+fn default_page() -> i64 {
+    1
+}
+fn default_limit() -> i64 {
+    10
+}
 
 /// Handler manages HTTP requests and responses for order endpoints.
 #[derive(Clone)]
@@ -60,8 +76,11 @@ async fn create(
     }
 }
 
-async fn get_all(State(service): State<Arc<dyn Service>>) -> Response {
-    match service.get_all_orders().await {
+async fn get_all(
+    State(service): State<Arc<dyn Service>>,
+    Query(query): Query<PaginationQuery>,
+) -> Response {
+    match service.get_all_orders(query.page, query.limit).await {
         Ok(orders) => (StatusCode::OK, Json(orders)).into_response(),
         Err(err) => (
             StatusCode::INTERNAL_SERVER_ERROR,

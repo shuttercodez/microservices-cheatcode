@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Response, status
+from fastapi import APIRouter, Query, Response, status
 from fastapi.responses import JSONResponse
 
 from app.product.model import (
@@ -41,9 +41,9 @@ class Handler:
         except Exception as exc:
             return JSONResponse(status_code=status.HTTP_409_CONFLICT, content={"error": str(exc)})
 
-    async def get_all(self):
+    async def get_all(self, page: int = Query(1), limit: int = Query(10)):
         try:
-            return await self.service.get_all()
+            return await self.service.get_all(page, limit)
         except Exception as exc:
             return JSONResponse(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

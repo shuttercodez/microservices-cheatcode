@@ -9,26 +9,47 @@ import (
 // Service defines the business logic contract for managing orders.
 type Service interface {
 	CreateOrder(ctx context.Context, req CreateOrderRequest) (*Order, error)
-	GetAllOrders(ctx context.Context) ([]Order, error)
+	GetAllOrders(ctx context.Context, page, limit int) (*PaginatedOrders, error)
 	GetOrderByID(ctx context.Context, id string) (*Order, error)
 }
 
 type service struct {
 	orderRepo      Repository
+	orderCache     Cache
 	productService product.Service // Cross-domain dependency injected via interface
 	producer       Producer
 }
 
-// NewService creates an Order Service with injected OrderRepository, ProductService, and OrderProducer.
-func NewService(orderRepo Repository, productService product.Service, producer Producer) Service {
+// NewService creates an Order Service with injected OrderRepository, OrderCache, ProductService, and OrderProducer.
+func NewService(orderRepo Repository, orderCache Cache, productService product.Service, producer Producer) Service {
 	return &service{
 		orderRepo:      orderRepo,
+		orderCache:     orderCache,
 		productService: productService,
 		producer:       producer,
 	}
 }
 
-// CreateOrder verifies product availability, deducts stock via ProductService, persists the order, and publishes an event.
+func normalizePagination(page, limit int) (int, int) {
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 {
+		limit = 10
+	} else if limit > 100 {
+		limit = 100
+	}
+	return page, limit
+}
+
+func calcTotalPages(total int64, limit int) int {
+	if total == 0 || limit <= 0 {
+		return 0
+	}
+	return int((total + int64(limit) - 1) / int64(limit))
+}
+
+// CreateOrder verifies product availability, deducts stock via ProductService, persists the order, caches it, and publishes an event.
 func (s *service) CreateOrder(ctx context.Context, req CreateOrderRequest) (*Order, error) {
 	if req.ProductID == "" || req.Quantity <= 0 {
 		return nil, ErrInvalidOrderInput
@@ -65,16 +86,65 @@ func (s *service) CreateOrder(ctx context.Context, req CreateOrderRequest) (*Ord
 		return nil, err
 	}
 
-	// 4. Publish order created event to RabbitMQ
+	// 4. Populate Redis cache and invalidate cached order lists
+	if s.orderCache != nil {
+		_ = s.orderCache.Set(ctx, order)
+		_ = s.orderCache.InvalidateLists(ctx)
+	}
+
+	// 5. Publish order created event to RabbitMQ
 	_ = s.producer.PublishOrderCreated(ctx, *order)
 
 	return order, nil
 }
 
-func (s *service) GetAllOrders(ctx context.Context) ([]Order, error) {
-	return s.orderRepo.FindAll(ctx)
+// GetAllOrders retrieves a paginated list of orders using Cache-Aside with Redis.
+func (s *service) GetAllOrders(ctx context.Context, page, limit int) (*PaginatedOrders, error) {
+	page, limit = normalizePagination(page, limit)
+
+	if s.orderCache != nil {
+		if cached, err := s.orderCache.GetList(ctx, page, limit); err == nil && cached != nil {
+			return cached, nil
+		}
+	}
+
+	orders, total, err := s.orderRepo.FindAll(ctx, page, limit)
+	if err != nil {
+		return nil, err
+	}
+	if orders == nil {
+		orders = []Order{}
+	}
+
+	res := &PaginatedOrders{
+		Data:       orders,
+		Page:       page,
+		Limit:      limit,
+		Total:      total,
+		TotalPages: calcTotalPages(total, limit),
+	}
+
+	if s.orderCache != nil {
+		_ = s.orderCache.SetList(ctx, page, limit, res)
+	}
+	return res, nil
 }
 
+// GetOrderByID retrieves an order by ID using Cache-Aside with Redis.
 func (s *service) GetOrderByID(ctx context.Context, id string) (*Order, error) {
-	return s.orderRepo.FindByID(ctx, id)
+	if s.orderCache != nil {
+		if cached, err := s.orderCache.Get(ctx, id); err == nil && cached != nil {
+			return cached, nil
+		}
+	}
+
+	order, err := s.orderRepo.FindByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	if s.orderCache != nil {
+		_ = s.orderCache.Set(ctx, order)
+	}
+	return order, nil
 }

@@ -91,6 +91,14 @@ class Product(BaseModel):
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
+class PaginatedProducts(BaseModel):
+    data: list[Product]
+    page: int
+    limit: int
+    total: int
+    total_pages: int
+
+
 class CreateProductRequest(BaseModel):
     sku: str = ""
     name: str = ""

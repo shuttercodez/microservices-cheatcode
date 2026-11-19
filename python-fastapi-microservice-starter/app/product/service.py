@@ -8,11 +8,28 @@ from app.product.model import (
     CreateProductRequest,
     ErrInvalidPayload,
     ErrNegativeStock,
+    PaginatedProducts,
     PatchStockRequest,
     Product,
 )
 from app.product.producer import Producer
 from app.product.repository import Repository
+
+
+def _normalize_pagination(page: int, limit: int) -> tuple[int, int]:
+    if page < 1:
+        page = 1
+    if limit < 1:
+        limit = 10
+    elif limit > 100:
+        limit = 100
+    return page, limit
+
+
+def _calc_total_pages(total: int, limit: int) -> int:
+    if total == 0 or limit <= 0:
+        return 0
+    return (total + limit - 1) // limit
 
 
 class Service(ABC):
@@ -23,7 +40,7 @@ class Service(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def get_all(self) -> list[Product]:
+    async def get_all(self, page: int = 1, limit: int = 10) -> PaginatedProducts:
         raise NotImplementedError
 
     @abstractmethod
@@ -71,11 +88,30 @@ class ProductService(Service):
 
         if self._cache is not None:
             await self._cache.set(created)
+            await self._cache.invalidate_lists()
         await self._producer.publish_stock_changed(created)
         return created
 
-    async def get_all(self) -> list[Product]:
-        return await self._repo.find_all()
+    async def get_all(self, page: int = 1, limit: int = 10) -> PaginatedProducts:
+        page, limit = _normalize_pagination(page, limit)
+
+        if self._cache is not None:
+            cached = await self._cache.get_list(page, limit)
+            if cached is not None:
+                return cached
+
+        products, total = await self._repo.find_all(page, limit)
+        res = PaginatedProducts(
+            data=products,
+            page=page,
+            limit=limit,
+            total=total,
+            total_pages=_calc_total_pages(total, limit),
+        )
+
+        if self._cache is not None:
+            await self._cache.set_list(page, limit, res)
+        return res
 
     async def get_by_id(self, product_id: str) -> Product:
         """Implements the Cache-Aside pattern: check Redis first, fallback to DB on miss, and populate Redis."""
@@ -106,6 +142,7 @@ class ProductService(Service):
 
         if self._cache is not None:
             await self._cache.set(updated)
+            await self._cache.invalidate_lists()
         await self._producer.publish_stock_changed(updated)
         return updated
 
@@ -120,6 +157,7 @@ class ProductService(Service):
         # Refresh Redis cache with the new stock and incremented version
         if self._cache is not None:
             await self._cache.set(updated)
+            await self._cache.invalidate_lists()
         await self._producer.publish_stock_changed(updated)
         return updated
 
@@ -127,3 +165,4 @@ class ProductService(Service):
         await self._repo.delete(product_id)
         if self._cache is not None:
             await self._cache.delete(product_id)
+            await self._cache.invalidate_lists()

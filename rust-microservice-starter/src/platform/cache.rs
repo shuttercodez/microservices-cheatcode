@@ -63,4 +63,14 @@ impl RedisCache {
         let _: () = conn.del(key).await?;
         Ok(())
     }
+
+    /// Deletes all keys matching a glob pattern (e.g., `products:list:*`).
+    pub async fn del_pattern(&self, pattern: &str) -> Result<()> {
+        let mut conn = self.manager.clone();
+        let keys: Vec<String> = conn.keys(pattern).await?;
+        if !keys.is_empty() {
+            let _: () = conn.del(keys).await?;
+        }
+        Ok(())
+    }
 }

@@ -1,4 +1,4 @@
-from app.product.cache import Cache, RedisProductCache
+from app.product.cache import Cache, RedisProductCache, list_cache_key
 from app.product.consumer import start_queue_consumer
 from app.product.handler import Handler
 from app.product.model import (
@@ -9,6 +9,7 @@ from app.product.model import (
     ErrProductNotFound,
     ErrSKUConflict,
     ErrVersionConflict,
+    PaginatedProducts,
     PatchStockRequest,
     Product,
     ProductModel,
@@ -28,6 +29,7 @@ __all__ = [
     "ErrSKUConflict",
     "ErrVersionConflict",
     "Handler",
+    "PaginatedProducts",
     "PatchStockRequest",
     "Producer",
     "Product",
@@ -39,5 +41,6 @@ __all__ = [
     "SQLAlchemyRepository",
     "Service",
     "StockChangedEvent",
+    "list_cache_key",
     "start_queue_consumer",
 ]

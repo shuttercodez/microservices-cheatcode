@@ -9,7 +9,7 @@ use uuid::Uuid;
 #[async_trait]
 pub trait Repository: Send + Sync {
     async fn create(&self, product: &mut Product) -> Result<(), ProductError>;
-    async fn find_all(&self) -> Result<Vec<Product>, ProductError>;
+    async fn find_all(&self, page: i64, limit: i64) -> Result<(Vec<Product>, i64), ProductError>;
     async fn find_by_id(&self, id: &str) -> Result<Product, ProductError>;
     async fn update(&self, product: &mut Product) -> Result<(), ProductError>;
     async fn update_stock_with_version(
@@ -50,19 +50,30 @@ impl Repository for SqlxRepository {
         Ok(())
     }
 
-    async fn find_all(&self) -> Result<Vec<Product>, ProductError> {
+    async fn find_all(&self, page: i64, limit: i64) -> Result<(Vec<Product>, i64), ProductError> {
+        let (total,): (i64,) =
+            sqlx::query_as("SELECT COUNT(*) FROM products WHERE deleted_at IS NULL")
+                .fetch_one(&self.db)
+                .await
+                .map_err(|e| ProductError::Internal(e.to_string()))?;
+
+        let offset = (page - 1) * limit;
         let products: Vec<Product> = sqlx::query_as(
             r#"
             SELECT id, sku, name, price::float8 AS price, stock, version, created_at, updated_at, deleted_at
             FROM products
             WHERE deleted_at IS NULL
+            ORDER BY created_at DESC
+            LIMIT $1 OFFSET $2
             "#,
         )
+        .bind(limit)
+        .bind(offset)
         .fetch_all(&self.db)
         .await
         .map_err(|e| ProductError::Internal(e.to_string()))?;
 
-        Ok(products)
+        Ok((products, total))
     }
 
     async fn find_by_id(&self, id: &str) -> Result<Product, ProductError> {

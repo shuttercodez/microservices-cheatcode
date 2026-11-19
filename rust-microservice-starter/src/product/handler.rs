@@ -1,13 +1,29 @@
 use crate::product::model::{CreateProductRequest, PatchStockRequest, ProductError};
 use crate::product::service::Service;
 use axum::extract::rejection::JsonRejection;
-use axum::extract::{Path, State};
+use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, patch};
 use axum::{Json, Router};
+use serde::Deserialize;
 use serde_json::json;
 use std::sync::Arc;
+
+#[derive(Debug, Deserialize)]
+pub struct PaginationQuery {
+    #[serde(default = "default_page")]
+    pub page: i64,
+    #[serde(default = "default_limit")]
+    pub limit: i64,
+}
+
+fn default_page() -> i64 {
+    1
+}
+fn default_limit() -> i64 {
+    10
+}
 
 /// Handler manages HTTP requests and responses for product endpoints.
 #[derive(Clone)]
@@ -24,7 +40,10 @@ impl Handler {
         Router::new()
             .route("/api/v1/products", get(get_all).post(create))
             .route("/api/v1/products/", get(get_all).post(create))
-            .route("/api/v1/products/{id}", get(get_by_id).put(update).delete(delete))
+            .route(
+                "/api/v1/products/{id}",
+                get(get_by_id).put(update).delete(delete),
+            )
             .route("/api/v1/products/{id}/stock", patch(patch_stock))
             .with_state(self.service.clone())
     }
@@ -57,8 +76,11 @@ async fn create(
     }
 }
 
-async fn get_all(State(service): State<Arc<dyn Service>>) -> Response {
-    match service.get_all().await {
+async fn get_all(
+    State(service): State<Arc<dyn Service>>,
+    Query(query): Query<PaginationQuery>,
+) -> Response {
+    match service.get_all(query.page, query.limit).await {
         Ok(products) => (StatusCode::OK, Json(products)).into_response(),
         Err(err) => (
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -159,7 +181,7 @@ async fn delete(State(service): State<Arc<dyn Service>>, Path(id): Path<String>)
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::product::model::Product;
+    use crate::product::model::{PaginatedProducts, Product};
     use crate::product::service::new_service;
     use crate::product::service::tests::{MockCache, MockProducer, MockRepository};
     use axum::body::Body;
@@ -204,7 +226,23 @@ mod tests {
         let resp = app.clone().oneshot(req).await.unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
 
-        // 3. PATCH /api/v1/products/:id/stock - updates product stock (200 OK)
+        // 3. GET /api/v1/products?page=1&limit=10 - retrieves paginated product list (200 OK)
+        let req = Request::builder()
+            .method(Method::GET)
+            .uri("/api/v1/products?page=1&limit=10")
+            .body(Body::empty())
+            .unwrap();
+
+        let resp = app.clone().oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body_bytes = resp.into_body().collect().await.unwrap().to_bytes();
+        let paginated: PaginatedProducts = serde_json::from_slice(&body_bytes).unwrap();
+        assert_eq!(paginated.page, 1);
+        assert_eq!(paginated.limit, 10);
+        assert_eq!(paginated.total, 1);
+        assert_eq!(paginated.data.len(), 1);
+
+        // 4. PATCH /api/v1/products/:id/stock - updates product stock (200 OK)
         let patch_payload = r#"{"stock":45}"#;
         let req = Request::builder()
             .method(Method::PATCH)

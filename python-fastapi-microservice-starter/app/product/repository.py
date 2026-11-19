@@ -4,7 +4,7 @@ import uuid
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
 
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -25,7 +25,7 @@ class Repository(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def find_all(self) -> list[Product]:
+    async def find_all(self, page: int, limit: int) -> tuple[list[Product], int]:
         raise NotImplementedError
 
     @abstractmethod
@@ -73,12 +73,26 @@ class SQLAlchemyRepository(Repository):
                 await session.rollback()
                 raise ErrSKUConflict() from exc
 
-    async def find_all(self) -> list[Product]:
+    async def find_all(self, page: int, limit: int) -> tuple[list[Product], int]:
+        offset = (page - 1) * limit
         async with self._session_factory() as session:
-            stmt = select(ProductModel).where(ProductModel.deleted_at.is_(None))
+            count_stmt = (
+                select(func.count())
+                .select_from(ProductModel)
+                .where(ProductModel.deleted_at.is_(None))
+            )
+            total = int((await session.execute(count_stmt)).scalar_one())
+
+            stmt = (
+                select(ProductModel)
+                .where(ProductModel.deleted_at.is_(None))
+                .order_by(ProductModel.created_at.desc())
+                .limit(limit)
+                .offset(offset)
+            )
             result = await session.execute(stmt)
             rows = result.scalars().all()
-            return [Product.model_validate(row) for row in rows]
+            return [Product.model_validate(row) for row in rows], total
 
     async def find_by_id(self, product_id: str) -> Product:
         try:

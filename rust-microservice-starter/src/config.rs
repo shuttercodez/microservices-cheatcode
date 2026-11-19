@@ -59,6 +59,17 @@ impl DatabaseConfig {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct RedisConfig {
     pub addr: String,
+    pub ttl_seconds: u64,
+}
+
+impl RedisConfig {
+    pub fn ttl(&self) -> Duration {
+        if self.ttl_seconds == 0 {
+            Duration::from_secs(300)
+        } else {
+            Duration::from_secs(self.ttl_seconds)
+        }
+    }
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -129,6 +140,11 @@ impl Config {
                 self.redis.addr = v;
             }
         }
+        if let Ok(v) = env::var("REDIS_TTL_SECONDS") {
+            if let Ok(ttl) = v.parse::<u64>() {
+                self.redis.ttl_seconds = ttl;
+            }
+        }
         if let Ok(v) = env::var("RABBITMQ_URL") {
             if !v.is_empty() {
                 self.rabbitmq.url = v;
@@ -160,6 +176,7 @@ database:
   ssl_mode: "require"
 redis:
   addr: "redis.internal:6379"
+  ttl_seconds: 600
 rabbitmq:
   url: "amqp://yaml:yaml@mq.internal:5672/"
 "#;

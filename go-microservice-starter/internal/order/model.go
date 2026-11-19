@@ -28,6 +28,15 @@ type Order struct {
 	DeletedAt  gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
+// PaginatedOrders represents a paginated list response for orders.
+type PaginatedOrders struct {
+	Data       []Order `json:"data"`
+	Page       int     `json:"page"`
+	Limit      int     `json:"limit"`
+	Total      int64   `json:"total"`
+	TotalPages int     `json:"total_pages"`
+}
+
 // CreateOrderRequest represents the request DTO for creating a new order (POST /api/v1/orders).
 type CreateOrderRequest struct {
 	ProductID string `json:"product_id"`

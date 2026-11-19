@@ -39,6 +39,11 @@ class DatabaseConfig(BaseModel):
 
 class RedisConfig(BaseModel):
     addr: str
+    ttl_seconds: int
+
+    @property
+    def ttl(self) -> int:
+        return self.ttl_seconds if self.ttl_seconds > 0 else 300
 
 
 class RabbitMQConfig(BaseModel):
@@ -89,5 +94,10 @@ class Config(BaseModel):
 
         if v := os.getenv("REDIS_ADDR"):
             self.redis.addr = v
+        if v := os.getenv("REDIS_TTL_SECONDS"):
+            try:
+                self.redis.ttl_seconds = int(v)
+            except ValueError:
+                pass
         if v := os.getenv("RABBITMQ_URL"):
             self.rabbitmq.url = v

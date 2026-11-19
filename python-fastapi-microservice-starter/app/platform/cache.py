@@ -31,5 +31,10 @@ class RedisCache:
     async def delete(self, key: str) -> None:
         await self.client.delete(key)
 
+    async def delete_pattern(self, pattern: str) -> None:
+        keys = await self.client.keys(pattern)
+        if keys:
+            await self.client.delete(*keys)
+
     async def close(self) -> None:
         await self.client.aclose()

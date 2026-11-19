@@ -30,12 +30,12 @@ func (m *mockOrderRepository) Create(ctx context.Context, order *Order) error {
 	return nil
 }
 
-func (m *mockOrderRepository) FindAll(ctx context.Context) ([]Order, error) {
+func (m *mockOrderRepository) FindAll(ctx context.Context, page, limit int) ([]Order, int64, error) {
 	var list []Order
 	for _, o := range m.orders {
 		list = append(list, *o)
 	}
-	return list, nil
+	return list, int64(len(list)), nil
 }
 
 func (m *mockOrderRepository) FindByID(ctx context.Context, id string) (*Order, error) {
@@ -44,6 +44,55 @@ func (m *mockOrderRepository) FindByID(ctx context.Context, id string) (*Order, 
 		return nil, ErrOrderNotFound
 	}
 	return o, nil
+}
+
+type mockOrderCache struct {
+	store     map[string]*Order
+	listStore map[string]*PaginatedOrders
+}
+
+func newMockOrderCache() *mockOrderCache {
+	return &mockOrderCache{
+		store:     make(map[string]*Order),
+		listStore: make(map[string]*PaginatedOrders),
+	}
+}
+
+func (m *mockOrderCache) Get(ctx context.Context, id string) (*Order, error) {
+	o, ok := m.store[id]
+	if !ok {
+		return nil, nil
+	}
+	copied := *o
+	return &copied, nil
+}
+
+func (m *mockOrderCache) Set(ctx context.Context, order *Order) error {
+	copied := *order
+	m.store[order.ID.String()] = &copied
+	return nil
+}
+
+func (m *mockOrderCache) GetList(ctx context.Context, page, limit int) (*PaginatedOrders, error) {
+	key := listCacheKey(page, limit)
+	list, ok := m.listStore[key]
+	if !ok {
+		return nil, nil
+	}
+	copied := *list
+	return &copied, nil
+}
+
+func (m *mockOrderCache) SetList(ctx context.Context, page, limit int, list *PaginatedOrders) error {
+	key := listCacheKey(page, limit)
+	copied := *list
+	m.listStore[key] = &copied
+	return nil
+}
+
+func (m *mockOrderCache) InvalidateLists(ctx context.Context) error {
+	m.listStore = make(map[string]*PaginatedOrders)
+	return nil
 }
 
 // mockProductService simulates cross-domain calls to ProductService.
@@ -63,7 +112,7 @@ func (m *mockProductService) Create(ctx context.Context, req product.CreateProdu
 	return nil, nil
 }
 
-func (m *mockProductService) GetAll(ctx context.Context) ([]product.Product, error) {
+func (m *mockProductService) GetAll(ctx context.Context, page, limit int) (*product.PaginatedProducts, error) {
 	return nil, nil
 }
 
@@ -129,7 +178,7 @@ func TestOrderService_CreateOrder(t *testing.T) {
 			Version: 1,
 		}
 
-		svc := NewService(orderRepo, prodSvc, producer)
+		svc := NewService(orderRepo, newMockOrderCache(), prodSvc, producer)
 
 		// Act: order 3 units
 		order, err := svc.CreateOrder(context.Background(), CreateOrderRequest{
@@ -169,7 +218,7 @@ func TestOrderService_CreateOrder(t *testing.T) {
 			Stock: 2,
 		}
 
-		svc := NewService(orderRepo, prodSvc, producer)
+		svc := NewService(orderRepo, newMockOrderCache(), prodSvc, producer)
 
 		// Act: attempt to order 5 units
 		_, err := svc.CreateOrder(context.Background(), CreateOrderRequest{
@@ -193,7 +242,7 @@ func TestOrderService_CreateOrder(t *testing.T) {
 		orderRepo := newMockOrderRepository()
 		prodSvc := newMockProductService()
 		producer := &mockOrderProducer{}
-		svc := NewService(orderRepo, prodSvc, producer)
+		svc := NewService(orderRepo, newMockOrderCache(), prodSvc, producer)
 
 		_, err := svc.CreateOrder(context.Background(), CreateOrderRequest{
 			ProductID: uuid.NewString(),

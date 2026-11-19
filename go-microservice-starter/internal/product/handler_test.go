@@ -57,6 +57,23 @@ func TestProductHandler_Endpoints(t *testing.T) {
 		}
 	})
 
+	t.Run("GET /api/v1/products?page=1&limit=10 - retrieves paginated product list (200 OK)", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/products/?page=1&limit=10", nil)
+		resp, err := app.Test(req)
+		if err != nil {
+			t.Fatalf("app.Test failed: %v", err)
+		}
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("expected status 200, got %d", resp.StatusCode)
+		}
+
+		var body PaginatedProducts
+		_ = json.NewDecoder(resp.Body).Decode(&body)
+		if body.Page != 1 || body.Limit != 10 || body.Total != 1 || len(body.Data) != 1 {
+			t.Errorf("unexpected paginated response: %+v", body)
+		}
+	})
+
 	t.Run("PATCH /api/v1/products/:id/stock - updates product stock (200 OK)", func(t *testing.T) {
 		payload := `{"stock":45}`
 		req := httptest.NewRequest(http.MethodPatch, "/api/v1/products/"+createdID+"/stock", bytes.NewBufferString(payload))

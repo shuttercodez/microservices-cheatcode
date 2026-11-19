@@ -15,7 +15,7 @@ var (
 	ErrInsufficientStock = errors.New("insufficient product stock for this order")
 )
 
-// Order represents the database entity for customer orders mapped directly via SQL/pgx (no ORM).
+// Order represents the database entity for customer orders mapped directly via SQL/sqlx (no ORM).
 type Order struct {
 	ID         uuid.UUID  `db:"id" json:"id"`
 	ProductID  uuid.UUID  `db:"product_id" json:"product_id"`
@@ -25,6 +25,15 @@ type Order struct {
 	CreatedAt  time.Time  `db:"created_at" json:"created_at"`
 	UpdatedAt  time.Time  `db:"updated_at" json:"updated_at"`
 	DeletedAt  *time.Time `db:"deleted_at" json:"-"`
+}
+
+// PaginatedOrders represents a paginated list response for orders.
+type PaginatedOrders struct {
+	Data       []Order `json:"data"`
+	Page       int     `json:"page"`
+	Limit      int     `json:"limit"`
+	Total      int64   `json:"total"`
+	TotalPages int     `json:"total_pages"`
 }
 
 // CreateOrderRequest represents the request DTO for creating a new order (POST /api/v1/orders).
