@@ -18,6 +18,7 @@ import (
 	"go-microservice-starter/internal/product"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/recover"
 )
 
@@ -95,8 +96,9 @@ func main() {
 		DisableStartupMessage: true,
 	})
 
-	// Register panic recovery middleware
+	// Register panic recovery and CORS middleware
 	app.Use(recover.New())
+	app.Use(cors.New())
 
 	// --- Microservice Health & Readiness Probes ---
 	app.Get("/healthz", func(c *fiber.Ctx) error {

@@ -15,6 +15,7 @@ use tokio::net::TcpListener;
 use tokio::signal;
 use tokio::sync::watch;
 use tower_http::catch_panic::CatchPanicLayer;
+use tower_http::cors::CorsLayer;
 use tracing::{error, info};
 
 #[tokio::main]
@@ -138,6 +139,7 @@ async fn main() {
         )
         .merge(product_handler.routes())
         .merge(order_handler.routes())
+        .layer(CorsLayer::permissive())
         .layer(CatchPanicLayer::new());
 
     // 7. Start Axum server and configure graceful shutdown

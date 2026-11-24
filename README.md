@@ -8,6 +8,7 @@ Designed for side-by-side comparison of project structure, tech stacks, database
 
 ## 📁 Projects in This Repository
 
+### Backend Microservices (Port `8080`)
 1. **[`go-microservice-starter`](./go-microservice-starter)** — **Go + Fiber + GORM**
    * Ideal for teams coming from Full ORM backgrounds (e.g., .NET EF Core or Java Spring Data JPA/Hibernate) looking for rapid CRUD development.
 2. **[`go-sqlx-microservice-starter`](./go-sqlx-microservice-starter)** — **Go + Fiber + `sqlx` (`pgx/v5`)**
@@ -16,6 +17,12 @@ Designed for side-by-side comparison of project structure, tech stacks, database
    * Ideal for high-performance, low-latency services leveraging zero-cost abstractions, memory safety, and the standard Tokio async ecosystem.
 4. **[`python-fastapi-microservice-starter`](./python-fastapi-microservice-starter)** — **Python + FastAPI + SQLAlchemy 2.0 (Async)**
    * Ideal for modern Python microservices built on full non-blocking Async I/O across the web layer, PostgreSQL, Redis, and RabbitMQ, powered by Pydantic v2 (Rust core).
+
+### Frontend Web Applications
+5. **[`react-nextjs-frontend`](./react-nextjs-frontend)** — **React 19 + Next.js 15 (App Router) + TypeScript + Tailwind CSS** (Port `3000`)
+   * Interactive Inventory & Order Console built with Next.js App Router and typed API client (`src/lib/api.ts`).
+6. **[`vue-nuxtjs-frontend`](./vue-nuxtjs-frontend)** — **Vue 3 + Nuxt 3 (Composition API) + TypeScript + Tailwind CSS** (Port `3001`)
+   * Interactive Inventory & Order Console built with Nuxt 3 `<script setup lang="ts">` and composables (`composables/useMicroserviceApi.ts`).
 
 ---
 
@@ -224,4 +231,30 @@ python3 -m venv .venv
 
 # Start the HTTP server (port 8080, Swagger UI available at http://localhost:8080/docs)
 ./.venv/bin/python -m app.main
+```
+
+---
+
+### 5. `react-nextjs-frontend` (React 19 + Next.js 15 App Router)
+```bash
+cd react-nextjs-frontend
+
+# Install dependencies
+npm install
+
+# Start the Next.js development server (http://localhost:3000)
+npm run dev
+```
+
+---
+
+### 6. `vue-nuxtjs-frontend` (Vue 3 + Nuxt 3)
+```bash
+cd vue-nuxtjs-frontend
+
+# Install dependencies
+npm install
+
+# Start the Nuxt 3 development server (http://localhost:3001)
+npm run dev
 ```

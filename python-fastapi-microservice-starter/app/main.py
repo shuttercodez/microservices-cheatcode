@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 import uvicorn
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 import app.order as order
@@ -115,6 +116,14 @@ def create_app() -> FastAPI:
             logger.info("Service exited cleanly")
 
     app_instance = FastAPI(title=cfg.app.name, lifespan=lifespan)
+
+    app_instance.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
     @app_instance.exception_handler(RequestValidationError)
     async def validation_exception_handler(_request: Request, _exc: RequestValidationError):
