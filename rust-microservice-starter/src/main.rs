@@ -30,7 +30,14 @@ async fn main() {
     let config_path = env::var("CONFIG_PATH")
         .ok()
         .filter(|s| !s.is_empty())
-        .unwrap_or_else(|| "config/config.yaml".to_string());
+        .unwrap_or_else(|| {
+            let local = "config/config.yaml";
+            if std::path::Path::new(local).exists() {
+                local.to_string()
+            } else {
+                format!("{}/config/config.yaml", env!("CARGO_MANIFEST_DIR"))
+            }
+        });
 
     let cfg = match Config::load(&config_path) {
         Ok(c) => c,
@@ -166,11 +173,11 @@ async fn main() {
         let _ = shutdown_tx.send(true);
     });
 
-    if let Err(err) = tokio::time::timeout(shutdown_timeout, server).await {
-        error!(error = %err, "Axum forced to shutdown");
+    if let Err(err) = server.await {
+        error!(error = %err, "Axum server error");
     }
 
-    mq.close().await;
+    let _ = tokio::time::timeout(shutdown_timeout, mq.close()).await;
     info!("Service exited cleanly");
 }
 
