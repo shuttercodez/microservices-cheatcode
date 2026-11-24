@@ -415,3 +415,33 @@ pub async fn jwt_middleware(
 
     next.run(req).await
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_generate_and_verify_jwt() {
+        let secret = "super-secret-jwt-key-for-unit-test";
+
+        // 1. Valid JWT generation and verification
+        let token = generate_jwt(
+            secret,
+            "admin",
+            Some("admin".to_string()),
+            "inventory:read inventory:write",
+            600,
+        )
+        .expect("failed to generate jwt");
+
+        let claims = verify_jwt(&token, secret).expect("failed to verify valid jwt");
+        assert_eq!(claims.sub, "admin");
+        assert_eq!(claims.role.as_deref(), Some("admin"));
+
+        // 2. Rejects wrong secret
+        assert!(verify_jwt(&token, "wrong-secret").is_err());
+
+        // 3. Rejects malformed token
+        assert!(verify_jwt("invalid.token", secret).is_err());
+    }
+}
