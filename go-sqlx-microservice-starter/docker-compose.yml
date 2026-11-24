@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   postgres:
     image: postgres:16-alpine
@@ -39,7 +37,7 @@ services:
       RABBITMQ_DEFAULT_USER: guest
       RABBITMQ_DEFAULT_PASS: guest
     ports:
-      - "5672:5672"   # AMQP port for Go client connections
+      - "5672:5672"   # AMQP port
       - "15672:15672" # Management Web UI (http://localhost:15672)
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
@@ -57,6 +55,65 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+
+  # Microservice API Container (Port 8080)
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: inventory_api
+    ports:
+      - "8080:8080"
+    environment:
+      APP_ENV: production
+      APP_PORT: 8080
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: appuser
+      DB_PASSWORD: apppassword
+      DB_NAME: inventory_db
+      DB_SSLMODE: disable
+      REDIS_ADDR: redis:6379
+      REDIS_TTL_SECONDS: 300
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # React 19 + Next.js 15 Frontend Console (Port 3000)
+  react-frontend:
+    build:
+      context: ../react-nextjs-frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: http://localhost:8080
+    container_name: inventory_react_frontend
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: http://localhost:8080
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  # Vue 3 + Nuxt 3 Frontend Console (Port 3001)
+  vue-frontend:
+    build:
+      context: ../vue-nuxtjs-frontend
+      dockerfile: Dockerfile
+    container_name: inventory_vue_frontend
+    ports:
+      - "3001:3001"
+    environment:
+      NUXT_PUBLIC_API_BASE_URL: http://localhost:8080
+    depends_on:
+      - api
+    restart: unless-stopped
 
 volumes:
   pgdata:

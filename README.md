@@ -170,14 +170,35 @@ Any value in `config.yaml` can be overridden at runtime via Environment Variable
 
 ## 🚀 Getting Started & Running Tests
 
-### 0. Start Infrastructure (PostgreSQL, Redis, RabbitMQ & Migrations)
-You can start the shared backing services from any project folder using Docker Compose:
+### Option A: One-Command Full Stack with Docker Compose (Recommended for Quick Demo)
+Every microservice project (`go-microservice-starter`, `go-sqlx-microservice-starter`, `rust-microservice-starter`, and `python-fastapi-microservice-starter`) includes a `Dockerfile` and a complete `docker-compose.yml` that spins up:
+* **PostgreSQL 16** (`:5432`) + automated **`migrate`** schema migrations
+* **Redis 7** (`:6379`)
+* **RabbitMQ 3.13 Management** (`:5672`, Web UI at `http://localhost:15672`)
+* **The Microservice API (`api`)** (`http://localhost:8080`)
+* **React 19 + Next.js 15 Frontend (`react-frontend`)** (`http://localhost:3000`)
+* **Vue 3 + Nuxt 3 Frontend (`vue-frontend`)** (`http://localhost:3001`)
+
+To run the entire stack for any language implementation:
 ```bash
+# Pick ANY of the 4 microservice projects:
 cd go-microservice-starter
-docker compose up -d
+# or: cd go-sqlx-microservice-starter
+# or: cd rust-microservice-starter
+# or: cd python-fastapi-microservice-starter
+
+# Build and start Infrastructure + Microservice API + React & Vue Frontends
+docker compose up --build -d
 ```
 
+> **Tip (Local Development Mode)**: If you only want to start the backing infrastructure (`postgres`, `migrate`, `redis`, `rabbitmq`) in Docker while running the backend/frontend directly on your host machine:
+> ```bash
+> docker compose up -d postgres migrate redis rabbitmq
+> ```
+
 ---
+
+### Option B: Running Locally on Host & Running Unit Tests
 
 ### 1. `go-microservice-starter` (Go + Fiber + GORM)
 ```bash
