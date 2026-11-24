@@ -1,3 +1,4 @@
+pub mod auth;
 pub mod config;
 pub mod order;
 pub mod platform;

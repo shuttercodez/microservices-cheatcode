@@ -10,6 +10,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	"go-microservice-starter/internal/auth"
 	"go-microservice-starter/internal/config"
 	"go-microservice-starter/internal/order"
 	"go-microservice-starter/internal/platform/cache"
@@ -111,6 +112,12 @@ func main() {
 		}
 		return c.Status(fiber.StatusOK).JSON(fiber.Map{"status": "ready"})
 	})
+
+	// --- OAuth 2.0 Token Endpoint & JWT Protection Middleware ---
+	authRepo := auth.NewRepository(db)
+	authHandler := auth.NewHandler(cfg.Auth, authRepo)
+	authHandler.RegisterRoutes(app)
+	app.Use("/api/v1", authHandler.Middleware())
 
 	// --- RESTful API Endpoints ---
 	productHandler.RegisterRoutes(app)

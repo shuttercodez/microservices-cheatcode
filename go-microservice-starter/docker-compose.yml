@@ -76,6 +76,9 @@ services:
       REDIS_ADDR: redis:6379
       REDIS_TTL_SECONDS: 300
       RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      JWT_SECRET: super-secret-jwt-signing-key-min-32-chars
+      JWT_TTL_SECONDS: 3600
+      AUTH_ENABLE_REGISTER: "false"
     depends_on:
       postgres:
         condition: service_healthy

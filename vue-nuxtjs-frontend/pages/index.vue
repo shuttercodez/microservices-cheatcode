@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, watch } from "vue";
+import type { OAuthTokenRequest, RegisterUserRequest } from "~/types/auth";
 import type { HealthStatus } from "~/types/common";
 import type { CreateOrderRequest } from "~/types/order";
 import type { CreateProductRequest, Product } from "~/types/product";
@@ -17,6 +18,7 @@ const selectedProductId = ref("");
 const errorMsg = ref<string | null>(null);
 const successMsg = ref<string | null>(null);
 
+const authState = useAuth(apiBaseUrl);
 const productsState = useProducts(apiBaseUrl);
 const ordersState = useOrders(apiBaseUrl);
 
@@ -36,10 +38,12 @@ function showError(msg: string) {
 async function syncDashboard() {
   try {
     health.value = await checkServiceHealth(apiBaseUrl.value);
-    await Promise.all([
-      productsState.fetchProducts(),
-      ordersState.fetchOrders(),
-    ]);
+    if (authState.isAuthenticated.value) {
+      await Promise.all([
+        productsState.fetchProducts(),
+        ordersState.fetchOrders(),
+      ]);
+    }
   } catch (err: unknown) {
     showError(
       err instanceof Error ? err.message : "Failed to connect to backend API"
@@ -51,9 +55,46 @@ onMounted(() => {
   syncDashboard();
 });
 
-watch([productsState.page, ordersState.page], () => {
-  syncDashboard();
-});
+watch(
+  [authState.isAuthenticated, productsState.page, ordersState.page],
+  () => {
+    syncDashboard();
+  }
+);
+
+async function handleLogin(req: OAuthTokenRequest) {
+  try {
+    const res = await authState.login(req);
+    showSuccess(
+      `Authenticated via OAuth 2.0 (${req.grant_type}) — Token expires in ${res.expires_in}s`
+    );
+    await syncDashboard();
+  } catch (err: unknown) {
+    showError(err instanceof Error ? err.message : "Authentication failed");
+  }
+}
+
+async function handleRegister(req: RegisterUserRequest) {
+  try {
+    const user = await authState.register(req);
+    await authState.login({
+      grant_type: "password",
+      username: req.username,
+      password: req.password,
+    });
+    showSuccess(
+      `Registered user "${user.username}" (${user.role}) in PostgreSQL and signed in!`
+    );
+    await syncDashboard();
+  } catch (err: unknown) {
+    showError(err instanceof Error ? err.message : "Registration failed");
+  }
+}
+
+function handleLogout() {
+  authState.logout();
+  showSuccess("Logged out and cleared JWT token");
+}
 
 async function handleCreateProduct(req: CreateProductRequest) {
   try {
@@ -87,7 +128,7 @@ async function handleDeleteProduct(product: Product) {
 async function handleCreateOrder(req: CreateOrderRequest) {
   try {
     const created = await ordersState.createOrder(req);
-    await productsState.fetchProducts(); // Refresh product stock after deduction
+    await productsState.fetchProducts();
     showSuccess(
       `Order placed (#${created.id.slice(0, 8)}) — Total: $${created.total_price.toLocaleString()}`
     );
@@ -108,7 +149,9 @@ function handleSelectForOrder(productId: string) {
       v-model:api-base-url="apiBaseUrl"
       :health="health"
       :loading="productsState.loading.value || ordersState.loading.value"
+      :is-authenticated="authState.isAuthenticated.value"
       @refresh="syncDashboard"
+      @logout="handleLogout"
     />
 
     <UiAlertBanner
@@ -122,67 +165,77 @@ function handleSelectForOrder(productId: string) {
       @dismiss="successMsg = null"
     />
 
-    <!-- Navigation Tabs -->
-    <div class="flex gap-2 mb-6 border-b border-slate-200">
-      <button
-        :class="[
-          'px-5 py-2.5 text-sm font-semibold border-b-2 -mb-px transition',
-          activeTab === 'products'
-            ? 'border-emerald-600 text-emerald-600'
-            : 'border-transparent text-slate-600 hover:text-slate-900',
-        ]"
-        @click="activeTab = 'products'"
-      >
-        📦 Products ({{ productsState.total.value }})
-      </button>
-      <button
-        :class="[
-          'px-5 py-2.5 text-sm font-semibold border-b-2 -mb-px transition',
-          activeTab === 'orders'
-            ? 'border-emerald-600 text-emerald-600'
-            : 'border-transparent text-slate-600 hover:text-slate-900',
-        ]"
-        @click="activeTab = 'orders'"
-      >
-        🧾 Orders ({{ ordersState.total.value }})
-      </button>
-    </div>
+    <AuthLoginCard
+      v-if="!authState.isAuthenticated.value"
+      :loading="authState.loading.value"
+      :enable-register="authState.enableRegister.value"
+      @login="handleLogin"
+      @register="handleRegister"
+    />
 
-    <!-- PRODUCTS TAB -->
-    <div
-      v-if="activeTab === 'products'"
-      class="grid grid-cols-1 lg:grid-cols-3 gap-6"
-    >
-      <ProductsProductForm @create="handleCreateProduct" />
-      <ProductsProductTable
-        :products="productsState.products.value"
-        :page="productsState.page.value"
-        :total-pages="productsState.totalPages.value"
-        :total="productsState.total.value"
-        @page-change="productsState.page.value = $event"
-        @patch-stock="handlePatchStock"
-        @delete="handleDeleteProduct"
-        @select-for-order="handleSelectForOrder"
-      />
-    </div>
+    <template v-else>
+      <!-- Navigation Tabs -->
+      <div class="flex gap-2 mb-6 border-b border-slate-200">
+        <button
+          :class="[
+            'px-5 py-2.5 text-sm font-semibold border-b-2 -mb-px transition',
+            activeTab === 'products'
+              ? 'border-emerald-600 text-emerald-600'
+              : 'border-transparent text-slate-600 hover:text-slate-900',
+          ]"
+          @click="activeTab = 'products'"
+        >
+          📦 Products ({{ productsState.total.value }})
+        </button>
+        <button
+          :class="[
+            'px-5 py-2.5 text-sm font-semibold border-b-2 -mb-px transition',
+            activeTab === 'orders'
+              ? 'border-emerald-600 text-emerald-600'
+              : 'border-transparent text-slate-600 hover:text-slate-900',
+          ]"
+          @click="activeTab = 'orders'"
+        >
+          🧾 Orders ({{ ordersState.total.value }})
+        </button>
+      </div>
 
-    <!-- ORDERS TAB -->
-    <div
-      v-if="activeTab === 'orders'"
-      class="grid grid-cols-1 lg:grid-cols-3 gap-6"
-    >
-      <OrdersOrderForm
-        v-model:selected-product-id="selectedProductId"
-        :products="productsState.products.value"
-        @create="handleCreateOrder"
-      />
-      <OrdersOrderTable
-        :orders="ordersState.orders.value"
-        :page="ordersState.page.value"
-        :total-pages="ordersState.totalPages.value"
-        :total="ordersState.total.value"
-        @page-change="ordersState.page.value = $event"
-      />
-    </div>
+      <!-- PRODUCTS TAB -->
+      <div
+        v-if="activeTab === 'products'"
+        class="grid grid-cols-1 lg:grid-cols-3 gap-6"
+      >
+        <ProductsProductForm @create="handleCreateProduct" />
+        <ProductsProductTable
+          :products="productsState.products.value"
+          :page="productsState.page.value"
+          :total-pages="productsState.totalPages.value"
+          :total="productsState.total.value"
+          @page-change="productsState.page.value = $event"
+          @patch-stock="handlePatchStock"
+          @delete="handleDeleteProduct"
+          @select-for-order="handleSelectForOrder"
+        />
+      </div>
+
+      <!-- ORDERS TAB -->
+      <div
+        v-if="activeTab === 'orders'"
+        class="grid grid-cols-1 lg:grid-cols-3 gap-6"
+      >
+        <OrdersOrderForm
+          v-model:selected-product-id="selectedProductId"
+          :products="productsState.products.value"
+          @create="handleCreateOrder"
+        />
+        <OrdersOrderTable
+          :orders="ordersState.orders.value"
+          :page="ordersState.page.value"
+          :total-pages="ordersState.totalPages.value"
+          :total="ordersState.total.value"
+          @page-change="ordersState.page.value = $event"
+        />
+      </div>
+    </template>
   </div>
 </template>

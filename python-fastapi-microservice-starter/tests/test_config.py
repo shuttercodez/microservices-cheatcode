@@ -27,6 +27,10 @@ redis:
   ttl_seconds: 600
 rabbitmq:
   url: "amqp://yaml:yaml@mq.internal:5672/"
+auth:
+  jwt_secret: "test-secret"
+  token_ttl_seconds: 3600
+  enable_register: true
 """
     yaml_path.write_text(yaml_content, encoding="utf-8")
 

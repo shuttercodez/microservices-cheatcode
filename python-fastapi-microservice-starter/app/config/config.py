@@ -50,11 +50,22 @@ class RabbitMQConfig(BaseModel):
     url: str
 
 
+class AuthConfig(BaseModel):
+    jwt_secret: str
+    token_ttl_seconds: int
+    enable_register: bool = True
+
+    @property
+    def token_ttl(self) -> int:
+        return self.token_ttl_seconds if self.token_ttl_seconds > 0 else 3600
+
+
 class Config(BaseModel):
     app: AppConfig
     database: DatabaseConfig
     redis: RedisConfig
     rabbitmq: RabbitMQConfig
+    auth: AuthConfig
 
     @classmethod
     def load(cls, path: Union[str, Path]) -> Config:
@@ -101,3 +112,12 @@ class Config(BaseModel):
                 pass
         if v := os.getenv("RABBITMQ_URL"):
             self.rabbitmq.url = v
+        if v := os.getenv("JWT_SECRET"):
+            self.auth.jwt_secret = v
+        if v := os.getenv("JWT_TTL_SECONDS"):
+            try:
+                self.auth.token_ttl_seconds = int(v)
+            except ValueError:
+                pass
+        if v := os.getenv("AUTH_ENABLE_REGISTER"):
+            self.auth.enable_register = v.strip().lower() in ("true", "1", "yes")

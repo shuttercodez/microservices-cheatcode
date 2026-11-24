@@ -63,7 +63,11 @@ Every project in this repository implements the exact same production-grade micr
    * `DELETE /api/v1/products/:id` sets `deleted_at = NOW()` instead of physically removing rows, and all read/update queries filter by `WHERE deleted_at IS NULL`.
 7. **Event-Driven Messaging (RabbitMQ Producer & Background Consumer)**
    * Publishes persistent JSON domain events (`delivery_mode = 2`) to durable queues (`inventory.stock_changed` and `order.created`) and runs background worker tasks to consume and acknowledge messages.
-8. **Single-Source Configuration, Cloud Vault Overrides & Graceful Shutdown**
+8. **Database-Backed OAuth 2.0 Server (`/oauth/register`, `/oauth/token`) & HS256 JWT Middleware**
+   * Stores user accounts (`users` table) and OAuth 2.0 M2M clients (`oauth_clients` table) in **PostgreSQL** with **Bcrypt (`pgcrypto` Blowfish `gen_salt('bf', 10)`)** password and client-secret hashing.
+   * Exposes `POST /oauth/register` to register new users directly in PostgreSQL and `POST /oauth/token` supporting RFC 6749 `password` and `client_credentials` grants to issue RFC 7519 HS256 signed JWT access tokens.
+   * All `/api/v1/*` endpoints are protected by JWT Bearer token verification middleware (`Authorization: Bearer <token>`), while `/healthz`, `/readyz`, `/oauth/register`, and `/oauth/token` remain public.
+9. **Single-Source Configuration, Cloud Vault Overrides & Graceful Shutdown**
    * `config/config.yaml` serves as the single source of truth for default settings (no duplicate hardcoded defaults in code), with runtime environment variable overrides for Cloud Secret Managers / Vaults.
    * Exposes Kubernetes-ready `/healthz` (Liveness) and `/readyz` (Readiness checking PostgreSQL, Redis, and RabbitMQ connectivity) probes.
    * Handles `SIGINT` / `SIGTERM` signals to stop background consumers and drain active HTTP connections cleanly.
@@ -125,6 +129,9 @@ Any value in `config.yaml` can be overridden at runtime via Environment Variable
 | `REDIS_ADDR` | `redis.addr` | Redis server address (`host:port` or `redis://...`) |
 | `REDIS_TTL_SECONDS` | `redis.ttl_seconds` | Redis cache TTL in seconds |
 | `RABBITMQ_URL` | `rabbitmq.url` | RabbitMQ AMQP connection URL (`amqp://...`) |
+| `JWT_SECRET` | `auth.jwt_secret` | HS256 JWT signing secret key |
+| `JWT_TTL_SECONDS` | `auth.token_ttl_seconds` | JWT access token expiration time in seconds |
+| `AUTH_ENABLE_REGISTER` | `auth.enable_register` | Feature flag (`true` / `false`) to enable or disable public user registration (`POST /oauth/register`) |
 
 ---
 
@@ -132,9 +139,12 @@ Any value in `config.yaml` can be overridden at runtime via Environment Variable
 
 | Method | Endpoint | Description | Status Codes |
 | :--- | :--- | :--- | :--- |
-| `GET` | `/healthz` | Liveness probe | `200 OK` |
-| `GET` | `/readyz` | Readiness probe (verifies PostgreSQL, Redis, and RabbitMQ connectivity) | `200 OK`, `503 Service Unavailable` |
-| `POST` | `/api/v1/products` | Create a new product, cache it in Redis, invalidate product lists, and publish a stock event | `201 Created`, `400 Bad Request`, `409 Conflict` |
+| `GET` | `/healthz` | Liveness probe (Public) | `200 OK` |
+| `GET` | `/readyz` | Readiness probe (Public — verifies PostgreSQL, Redis, and RabbitMQ connectivity) | `200 OK`, `503 Service Unavailable` |
+| `GET` | `/oauth/config` | Public OAuth configuration flags (e.g., `{"enable_register": true}`) | `200 OK` |
+| `POST` | `/oauth/register` | Register a new user account in PostgreSQL (`users` table) with Bcrypt password hashing (returns `403` when `enable_register: false`) | `201 Created`, `400 Bad Request`, `403 Forbidden`, `409 Conflict` |
+| `POST` | `/oauth/token` | OAuth 2.0 Token Endpoint (`password` or `client_credentials` verified against PostgreSQL) issuing HS256 JWT | `200 OK`, `400 Bad Request`, `401 Unauthorized` |
+| `POST` | `/api/v1/products` | 🔒 Create a new product, cache it in Redis, invalidate product lists, and publish a stock event | `201 Created`, `400 Bad Request`, `401 Unauthorized`, `409 Conflict` |
 | `GET` | `/api/v1/products` | List active products with pagination (`?page=1&limit=10`) and Redis list caching | `200 OK` |
 | `GET` | `/api/v1/products/:id` | Get a product by ID using the **Cache-Aside** pattern | `200 OK`, `404 Not Found` |
 | `PUT` | `/api/v1/products/:id` | Replace product details, refresh Redis cache, invalidate product lists, and publish an event | `200 OK`, `400 Bad Request`, `404 Not Found` |

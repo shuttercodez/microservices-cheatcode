@@ -1,7 +1,9 @@
 use axum::http::StatusCode;
+use axum::middleware;
 use axum::response::IntoResponse;
 use axum::routing::get;
 use axum::{Json, Router};
+use rust_microservice_starter::auth;
 use rust_microservice_starter::config::Config;
 use rust_microservice_starter::order;
 use rust_microservice_starter::platform::cache::RedisCache;
@@ -117,6 +119,16 @@ async fn main() {
     let redis_ready = redis_cache.clone();
     let mq_ready = mq.clone();
 
+    let auth_handler = auth::Handler::new(cfg.auth.clone(), db.clone());
+
+    let protected_routes = Router::new()
+        .merge(product_handler.routes())
+        .merge(order_handler.routes())
+        .route_layer(middleware::from_fn_with_state(
+            cfg.auth.clone(),
+            auth::jwt_middleware,
+        ));
+
     let app = Router::new()
         .route(
             "/healthz",
@@ -144,8 +156,8 @@ async fn main() {
                 }
             }),
         )
-        .merge(product_handler.routes())
-        .merge(order_handler.routes())
+        .merge(auth_handler.routes())
+        .merge(protected_routes)
         .layer(CorsLayer::permissive())
         .layer(CatchPanicLayer::new());
 

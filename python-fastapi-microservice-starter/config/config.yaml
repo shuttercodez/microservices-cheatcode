@@ -22,3 +22,8 @@ redis:
 
 rabbitmq:
   url: "amqp://guest:guest@localhost:5672/"
+
+auth:
+  jwt_secret: "super-secret-jwt-signing-key-min-32-chars"
+  token_ttl_seconds: 3600
+  enable_register: true

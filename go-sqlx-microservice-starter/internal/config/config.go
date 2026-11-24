@@ -15,6 +15,20 @@ type Config struct {
 	Database DatabaseConfig `yaml:"database"`
 	Redis    RedisConfig    `yaml:"redis"`
 	RabbitMQ RabbitMQConfig `yaml:"rabbitmq"`
+	Auth     AuthConfig     `yaml:"auth"`
+}
+
+type AuthConfig struct {
+	JWTSecret       string `yaml:"jwt_secret"`
+	TokenTTLSeconds int    `yaml:"token_ttl_seconds"`
+	EnableRegister  bool   `yaml:"enable_register"`
+}
+
+func (a AuthConfig) TokenTTL() time.Duration {
+	if a.TokenTTLSeconds <= 0 {
+		return 3600 * time.Second
+	}
+	return time.Duration(a.TokenTTLSeconds) * time.Second
 }
 
 type AppConfig struct {
@@ -129,5 +143,18 @@ func applyEnvOverrides(cfg *Config) {
 	}
 	if v := os.Getenv("RABBITMQ_URL"); v != "" {
 		cfg.RabbitMQ.URL = v
+	}
+	if v := os.Getenv("JWT_SECRET"); v != "" {
+		cfg.Auth.JWTSecret = v
+	}
+	if v := os.Getenv("JWT_TTL_SECONDS"); v != "" {
+		if ttl, err := strconv.Atoi(v); err == nil {
+			cfg.Auth.TokenTTLSeconds = ttl
+		}
+	}
+	if v := os.Getenv("AUTH_ENABLE_REGISTER"); v != "" {
+		if enabled, err := strconv.ParseBool(v); err == nil {
+			cfg.Auth.EnableRegister = enabled
+		}
 	}
 }

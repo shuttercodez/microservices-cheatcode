@@ -29,6 +29,10 @@ redis:
   ttl_seconds: 600
 rabbitmq:
   url: "amqp://yaml:yaml@mq.internal:5672/"
+auth:
+  jwt_secret: "test-secret"
+  token_ttl_seconds: 3600
+  enable_register: true
 `
 	if err := os.WriteFile(yamlPath, []byte(yamlContent), 0600); err != nil {
 		t.Fatalf("failed to write temp yaml: %v", err)

@@ -16,6 +16,7 @@ from fastapi.responses import JSONResponse
 
 import app.order as order
 import app.product as product
+from app.auth import AuthHandler, verify_jwt
 from app.config import Config
 from app.platform import PostgresDatabase, RabbitMQ, RedisCache
 
@@ -77,6 +78,8 @@ def create_app() -> FastAPI:
         )
 
         # 5. Dependency Injection (Repository, Cache & Producer -> Service -> Handler)
+        auth_handler = AuthHandler(cfg.auth, db.session_factory)
+        app_instance.include_router(auth_handler.router)
         # --- Product Domain ---
         product_repo = product.SQLAlchemyRepository(db.session_factory)
         product_cache = product.RedisProductCache(redis_cache, cfg.redis.ttl)
@@ -116,6 +119,25 @@ def create_app() -> FastAPI:
             logger.info("Service exited cleanly")
 
     app_instance = FastAPI(title=cfg.app.name, lifespan=lifespan)
+
+    @app_instance.middleware("http")
+    async def jwt_auth_middleware(request: Request, call_next):
+        if request.method != "OPTIONS" and request.url.path.startswith("/api/v1"):
+            auth_header = request.headers.get("authorization", "")
+            if not auth_header.startswith("Bearer "):
+                return JSONResponse(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    content={"error": "missing or invalid Authorization Bearer token"},
+                )
+            token_str = auth_header[7:]
+            try:
+                verify_jwt(token_str, cfg.auth.jwt_secret)
+            except ValueError as exc:
+                return JSONResponse(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    content={"error": str(exc)},
+                )
+        return await call_next(request)
 
     app_instance.add_middleware(
         CORSMiddleware,

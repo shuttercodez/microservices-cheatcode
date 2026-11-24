@@ -10,6 +10,25 @@ pub struct Config {
     pub database: DatabaseConfig,
     pub redis: RedisConfig,
     pub rabbitmq: RabbitMQConfig,
+    pub auth: AuthConfig,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct AuthConfig {
+    pub jwt_secret: String,
+    pub token_ttl_seconds: u64,
+    #[serde(default)]
+    pub enable_register: bool,
+}
+
+impl AuthConfig {
+    pub fn token_ttl_secs(&self) -> u64 {
+        if self.token_ttl_seconds == 0 {
+            3600
+        } else {
+            self.token_ttl_seconds
+        }
+    }
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -150,6 +169,23 @@ impl Config {
                 self.rabbitmq.url = v;
             }
         }
+        if let Ok(v) = env::var("JWT_SECRET") {
+            if !v.is_empty() {
+                self.auth.jwt_secret = v;
+            }
+        }
+        if let Ok(v) = env::var("JWT_TTL_SECONDS") {
+            if let Ok(ttl) = v.parse::<u64>() {
+                self.auth.token_ttl_seconds = ttl;
+            }
+        }
+        if let Ok(v) = env::var("AUTH_ENABLE_REGISTER") {
+            match v.to_lowercase().as_str() {
+                "true" | "1" | "yes" => self.auth.enable_register = true,
+                "false" | "0" | "no" => self.auth.enable_register = false,
+                _ => {}
+            }
+        }
     }
 }
 
@@ -179,6 +215,10 @@ redis:
   ttl_seconds: 600
 rabbitmq:
   url: "amqp://yaml:yaml@mq.internal:5672/"
+auth:
+  jwt_secret: "test-secret"
+  token_ttl_seconds: 3600
+  enable_register: true
 "#;
 
         let mut tmp_file = NamedTempFile::new().expect("failed to create temp file");
