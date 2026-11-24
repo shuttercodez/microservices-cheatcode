@@ -1,4 +1,4 @@
-import { computed, onMounted, ref, watch, type Ref } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch, type Ref } from "vue";
 import type {
   AuthConfigResponse,
   OAuthTokenRequest,
@@ -6,9 +6,19 @@ import type {
   RegisterUserRequest,
   UserResponse,
 } from "~/types/auth";
-import { apiRequest, getAccessToken, setAccessToken } from "~/utils/api-client";
+import {
+  apiRequest,
+  AUTH_EXPIRED_EVENT,
+  getAccessToken,
+  isJwtExpired,
+  notifySessionExpired,
+  setAccessToken,
+} from "~/utils/api-client";
 
-export function useAuth(apiBaseUrl: Ref<string>) {
+export function useAuth(
+  apiBaseUrl: Ref<string>,
+  onSessionExpired?: (message: string) => void
+) {
   const token = ref<string | null>(null);
   const enableRegister = ref<boolean>(true);
   const loading = ref(false);
@@ -26,9 +36,34 @@ export function useAuth(apiBaseUrl: Ref<string>) {
     }
   }
 
+  function handleExpiredEvent(event: Event) {
+    const customEvent = event as CustomEvent<string>;
+    token.value = null;
+    if (onSessionExpired) {
+      onSessionExpired(
+        customEvent.detail || "Your session has expired. Please sign in again."
+      );
+    }
+  }
+
   onMounted(() => {
-    token.value = getAccessToken();
+    if (typeof window !== "undefined") {
+      window.addEventListener(AUTH_EXPIRED_EVENT, handleExpiredEvent);
+      const raw = localStorage.getItem("microservice_jwt_token");
+      if (raw && isJwtExpired(raw)) {
+        notifySessionExpired("Your session has expired. Please sign in again.");
+        token.value = null;
+      } else {
+        token.value = getAccessToken();
+      }
+    }
     fetchAuthConfig();
+  });
+
+  onUnmounted(() => {
+    if (typeof window !== "undefined") {
+      window.removeEventListener(AUTH_EXPIRED_EVENT, handleExpiredEvent);
+    }
   });
 
   watch(apiBaseUrl, () => {

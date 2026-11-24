@@ -18,10 +18,6 @@ const selectedProductId = ref("");
 const errorMsg = ref<string | null>(null);
 const successMsg = ref<string | null>(null);
 
-const authState = useAuth(apiBaseUrl);
-const productsState = useProducts(apiBaseUrl);
-const ordersState = useOrders(apiBaseUrl);
-
 function showSuccess(msg: string) {
   successMsg.value = msg;
   errorMsg.value = null;
@@ -34,6 +30,10 @@ function showError(msg: string) {
   errorMsg.value = msg;
   successMsg.value = null;
 }
+
+const authState = useAuth(apiBaseUrl, showError);
+const productsState = useProducts(apiBaseUrl);
+const ordersState = useOrders(apiBaseUrl);
 
 async function syncDashboard() {
   try {

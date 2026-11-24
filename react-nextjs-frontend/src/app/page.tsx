@@ -35,20 +35,20 @@ export default function DashboardPage() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
-  const authState = useAuth(apiBaseUrl);
-  const productsState = useProducts(apiBaseUrl);
-  const ordersState = useOrders(apiBaseUrl);
-
-  const showSuccess = (msg: string) => {
+  const showSuccess = useCallback((msg: string) => {
     setSuccessMsg(msg);
     setErrorMsg(null);
     setTimeout(() => setSuccessMsg(null), 4000);
-  };
+  }, []);
 
-  const showError = (msg: string) => {
+  const showError = useCallback((msg: string) => {
     setErrorMsg(msg);
     setSuccessMsg(null);
-  };
+  }, []);
+
+  const authState = useAuth(apiBaseUrl, showError);
+  const productsState = useProducts(apiBaseUrl);
+  const ordersState = useOrders(apiBaseUrl);
 
   const syncDashboard = useCallback(async () => {
     try {

@@ -1,18 +1,52 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getAccessToken, setAccessToken } from "@/lib/api-client";
+import {
+  AUTH_EXPIRED_EVENT,
+  getAccessToken,
+  isJwtExpired,
+  notifySessionExpired,
+  setAccessToken,
+} from "@/lib/api-client";
 import { authApi } from "../api/auth-api";
 import { OAuthTokenRequest, RegisterUserRequest } from "../types/auth";
 
-export function useAuth(apiBaseUrl: string) {
+export function useAuth(
+  apiBaseUrl: string,
+  onSessionExpired?: (message: string) => void
+) {
   const [token, setTokenState] = useState<string | null>(null);
   const [enableRegister, setEnableRegister] = useState<boolean>(true);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    setTokenState(getAccessToken());
+    const raw =
+      typeof window !== "undefined"
+        ? localStorage.getItem("microservice_jwt_token")
+        : null;
+    if (raw && isJwtExpired(raw)) {
+      notifySessionExpired("Your session has expired. Please sign in again.");
+      setTokenState(null);
+    } else {
+      setTokenState(getAccessToken());
+    }
   }, []);
+
+  useEffect(() => {
+    const handleExpired = (event: Event) => {
+      const customEvent = event as CustomEvent<string>;
+      setTokenState(null);
+      if (onSessionExpired) {
+        onSessionExpired(
+          customEvent.detail ||
+            "Your session has expired. Please sign in again."
+        );
+      }
+    };
+
+    window.addEventListener(AUTH_EXPIRED_EVENT, handleExpired);
+    return () => window.removeEventListener(AUTH_EXPIRED_EVENT, handleExpired);
+  }, [onSessionExpired]);
 
   useEffect(() => {
     authApi
